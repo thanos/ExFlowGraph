@@ -9,7 +9,7 @@ defmodule ExFlowGraphWeb.ExFlow.Node do
   def node(assigns) do
     ~H"""
     <div
-      class="exflow-node absolute select-none rounded-lg border border-base-300 bg-base-100/90 shadow-sm backdrop-blur px-3 py-2 text-sm text-base-content cursor-grab active:cursor-grabbing"
+      class="exflow-node absolute select-none rounded-lg border border-base-300 bg-base-100/90 shadow-sm backdrop-blur px-3 py-2 text-sm text-base-content cursor-grab active:cursor-grabbing pointer-events-auto"
       data-id={@id}
       data-x={@x}
       data-y={@y}

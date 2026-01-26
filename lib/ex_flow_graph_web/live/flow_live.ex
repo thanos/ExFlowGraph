@@ -15,7 +15,9 @@ defmodule ExFlowGraphWeb.FlowLive do
           graph
 
         _ ->
-          {:ok, g1} = FlowGraph.add_node(FlowGraph.new(), "agent-1", :agent, %{position: %{x: 120, y: 120}})
+          {:ok, g1} =
+            FlowGraph.add_node(FlowGraph.new(), "agent-1", :agent, %{position: %{x: 120, y: 120}})
+
           {:ok, g2} = FlowGraph.add_node(g1, "task-1", :task, %{position: %{x: 520, y: 260}})
           {:ok, g3} = FlowGraph.add_edge(g2, "edge-1", "agent-1", "out", "task-1", "in")
           g3
@@ -35,7 +37,7 @@ defmodule ExFlowGraphWeb.FlowLive do
       {:ok, graph} ->
         :ok = InMemory.save(@storage_id, graph)
         {:noreply, assign(socket, :graph, graph)}
-      
+
       {:error, _reason} ->
         {:noreply, socket}
     end
@@ -55,7 +57,7 @@ defmodule ExFlowGraphWeb.FlowLive do
           <div>
             <h1 class="text-2xl font-semibold tracking-tight">ExFlow</h1>
             <p class="mt-1 text-sm text-base-content/70">
-              Hybrid canvas: HTML nodes + SVG edges. Drag is client-side; persistence happens on mouseup.
+              Hybrid canvas: HTML nodes + SVG edges. Drag nodes to move • Drag background to pan • Scroll to zoom
             </p>
           </div>
         </div>
