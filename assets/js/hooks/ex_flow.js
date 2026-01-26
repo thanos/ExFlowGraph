@@ -134,17 +134,12 @@ export default {
     this.el.style.cursor = "grab"
 
     // Initial edge layout once DOM is ready
-    queueMicrotask(() => {
-      const paths = this.el.querySelectorAll("path.exflow-edge")
-      for (const pathEl of paths) {
-        const sourceId = pathEl.dataset.sourceId
-        const targetId = pathEl.dataset.targetId
-        const s = this.getNodeCenter(sourceId)
-        const t = this.getNodeCenter(targetId)
-        if (!s || !t) continue
-        pathEl.setAttribute("d", cubicBezierPath(s.x, s.y, t.x, t.y))
-      }
-    })
+    queueMicrotask(() => this.redrawAllEdges())
+  },
+
+  updated() {
+    // Redraw all edges after LiveView updates the DOM
+    this.redrawAllEdges()
   },
 
   destroyed() {
@@ -152,6 +147,18 @@ export default {
     this.el.removeEventListener("wheel", this.onWheel)
     window.removeEventListener("mousemove", this.onMouseMove)
     window.removeEventListener("mousemove", this.onPanMove)
+  },
+  
+  redrawAllEdges() {
+    const paths = this.el.querySelectorAll("path.exflow-edge")
+    for (const pathEl of paths) {
+      const sourceId = pathEl.dataset.sourceId
+      const targetId = pathEl.dataset.targetId
+      const s = this.getNodeCenter(sourceId)
+      const t = this.getNodeCenter(targetId)
+      if (!s || !t) continue
+      pathEl.setAttribute("d", cubicBezierPath(s.x, s.y, t.x, t.y))
+    }
   },
   
   applyTransform() {
