@@ -202,8 +202,19 @@ export default {
     const nodeEl = this.el.querySelector(`.exflow-node[data-id='${id}']`)
     if (!nodeEl) return null
 
-    const x = parseFloat(nodeEl.dataset.x || "0")
-    const y = parseFloat(nodeEl.dataset.y || "0")
+    // Try to read from current transform first (for live drag updates)
+    let x = parseFloat(nodeEl.dataset.x || "0")
+    let y = parseFloat(nodeEl.dataset.y || "0")
+    
+    // Check if there's a transform style applied (during drag)
+    const transform = nodeEl.style.transform
+    if (transform) {
+      const match = transform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/)
+      if (match) {
+        x = parseFloat(match[1])
+        y = parseFloat(match[2])
+      }
+    }
 
     const w = nodeEl.offsetWidth
     const h = nodeEl.offsetHeight
