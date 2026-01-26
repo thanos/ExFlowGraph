@@ -95,19 +95,14 @@ defmodule ExFlowGraphWeb.FlowLive do
   defp edges_for_ui(%LibGraph{} = graph, nodes) do
     node_by_id = Map.new(nodes, fn n -> {n.id, n} end)
 
-    for edge <- LibGraph.edges(graph) do
-      source = Map.get(node_by_id, edge.v1)
-      target = Map.get(node_by_id, edge.v2)
-      
-      edge_id = case edge.label do
-        %{id: id} -> id
-        _ -> "#{edge.v1}-#{edge.v2}"
-      end
+    for edge <- FlowGraph.get_edges(graph) do
+      source = Map.get(node_by_id, edge.source)
+      target = Map.get(node_by_id, edge.target)
 
       %{
-        id: edge_id,
-        source_id: edge.v1,
-        target_id: edge.v2,
+        id: edge.id,
+        source_id: edge.source,
+        target_id: edge.target,
         source_x: source.x + 12,
         source_y: source.y + 12,
         target_x: target.x + 12,
