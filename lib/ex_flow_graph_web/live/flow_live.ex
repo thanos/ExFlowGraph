@@ -98,9 +98,14 @@ defmodule ExFlowGraphWeb.FlowLive do
     for edge <- LibGraph.edges(graph) do
       source = Map.get(node_by_id, edge.v1)
       target = Map.get(node_by_id, edge.v2)
+      
+      edge_id = case edge.label do
+        %{id: id} -> id
+        _ -> "#{edge.v1}-#{edge.v2}"
+      end
 
       %{
-        id: edge.label || "#{edge.v1}-#{edge.v2}",
+        id: edge_id,
         source_id: edge.v1,
         target_id: edge.v2,
         source_x: source.x + 12,
