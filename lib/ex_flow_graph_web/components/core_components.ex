@@ -29,7 +29,7 @@ defmodule ExFlowGraphWeb.CoreComponents do
   use Phoenix.Component
   use Gettext, backend: ExFlowGraphWeb.Gettext
 
-  alias  Phoenix.HTML.Form
+  alias Phoenix.HTML.Form
   alias Phoenix.LiveView.JS
 
   @doc """
