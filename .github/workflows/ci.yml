@@ -55,7 +55,8 @@ jobs:
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
-
+      - name: Ensure cache directories exist
+        run: mkdir -p deps _build
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
