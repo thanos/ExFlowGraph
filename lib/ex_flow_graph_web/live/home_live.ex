@@ -3,6 +3,8 @@ defmodule ExFlowGraphWeb.HomeLive do
 
   alias ExFlow.Core.Graph, as: FlowGraph
   alias ExFlow.Storage.InMemory
+  alias ExFlowGraphWeb.Live.Collaboration
+  alias ExFlowGraphWeb.Presence
 
   @storage_id "demo-graph"
 
@@ -18,6 +20,30 @@ defmodule ExFlowGraphWeb.HomeLive do
           create_demo_graph()
       end
 
+    # Set up collaboration
+    {user_id, user_color} =
+      if connected?(socket) do
+        Collaboration.subscribe(@storage_id)
+
+        # Generate user identity
+        user_id = Collaboration.get_user_id(socket)
+        user_color = Collaboration.generate_user_color()
+
+        # Track presence
+        {:ok, _} =
+          Presence.track(self(), Collaboration.graph_topic(@storage_id), user_id, %{
+            name: "User #{String.slice(user_id, -4..-1)}",
+            color: user_color,
+            cursor: %{x: 0, y: 0},
+            locked_nodes: [],
+            online_at: System.system_time(:second)
+          })
+
+        {user_id, user_color}
+      else
+        {nil, nil}
+      end
+
     socket =
       socket
       |> assign(:graph, graph)
@@ -30,15 +56,28 @@ defmodule ExFlowGraphWeb.HomeLive do
       |> assign(:show_help, false)
       |> assign(:selected_node_ids, MapSet.new())
       |> assign(:history, ExFlow.HistoryManager.new())
+      |> assign(:user_id, user_id)
+      |> assign(:user_color, user_color)
+      |> assign(:active_users, %{})
+      |> assign(:remote_cursors, %{})
+      |> assign(:locked_nodes, MapSet.new())
 
     {:ok, socket}
   end
 
   @impl true
   def handle_event("update_position", %{"id" => id, "x" => x, "y" => y}, socket) do
-    case FlowGraph.update_node_position(socket.assigns.graph, id, %{x: round(x), y: round(y)}) do
+    position = %{x: round(x), y: round(y)}
+
+    case FlowGraph.update_node_position(socket.assigns.graph, id, position) do
       {:ok, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast to other users
+        if socket.assigns.user_id do
+          Collaboration.broadcast_node_moved(@storage_id, socket.assigns.user_id, id, position)
+        end
+
         {:noreply, assign(socket, :graph, graph)}
 
       {:error, _reason} ->
@@ -71,6 +110,20 @@ defmodule ExFlowGraphWeb.HomeLive do
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast to other users
+        if socket.assigns.user_id do
+          edge = %{
+            id: edge_id,
+            source: source_id,
+            source_handle: source_handle,
+            target: target_id,
+            target_handle: target_handle
+          }
+
+          Collaboration.broadcast_edge_created(@storage_id, socket.assigns.user_id, edge)
+        end
+
         {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
@@ -93,6 +146,13 @@ defmodule ExFlowGraphWeb.HomeLive do
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast to other users
+        if socket.assigns.user_id do
+          {:ok, node} = FlowGraph.get_node(graph, node_id)
+          Collaboration.broadcast_node_created(@storage_id, socket.assigns.user_id, node)
+        end
+
         {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
@@ -107,6 +167,12 @@ defmodule ExFlowGraphWeb.HomeLive do
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast to other users
+        if socket.assigns.user_id do
+          Collaboration.broadcast_node_deleted(@storage_id, socket.assigns.user_id, id)
+        end
+
         {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
@@ -344,6 +410,148 @@ defmodule ExFlowGraphWeb.HomeLive do
   end
 
   @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: diff}, socket) do
+    # Update active users list
+    active_users =
+      Presence.list(Collaboration.graph_topic(@storage_id))
+      |> Enum.into(%{}, fn {user_id, %{metas: [meta | _]}} ->
+        {user_id, meta}
+      end)
+
+    {:noreply, assign(socket, :active_users, active_users)}
+  end
+
+  @impl true
+  def handle_info({:cursor_moved, %{user_id: user_id, x: x, y: y}}, socket) do
+    # Don't process our own cursor
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      remote_cursors = Map.put(socket.assigns.remote_cursors, user_id, %{x: x, y: y})
+      {:noreply, assign(socket, :remote_cursors, remote_cursors)}
+    end
+  end
+
+  @impl true
+  def handle_info({:node_locked, %{user_id: user_id, node_id: node_id}}, socket) do
+    # Don't process our own locks
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      locked_nodes = MapSet.put(socket.assigns.locked_nodes, node_id)
+      {:noreply, assign(socket, :locked_nodes, locked_nodes)}
+    end
+  end
+
+  @impl true
+  def handle_info({:node_unlocked, %{user_id: user_id, node_id: node_id}}, socket) do
+    # Don't process our own unlocks
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      locked_nodes = MapSet.delete(socket.assigns.locked_nodes, node_id)
+      {:noreply, assign(socket, :locked_nodes, locked_nodes)}
+    end
+  end
+
+  @impl true
+  def handle_info({:node_created, %{user_id: user_id, node: node}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Add the node to our graph
+      case FlowGraph.add_node(
+             socket.assigns.graph,
+             node.id,
+             node.type,
+             %{position: node.position, metadata: node.metadata}
+           ) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info({:node_deleted, %{user_id: user_id, node_id: node_id}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Delete the node from our graph
+      case FlowGraph.delete_node(socket.assigns.graph, node_id) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info({:node_moved, %{user_id: user_id, node_id: node_id, position: position}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Update the node position in our graph
+      case FlowGraph.update_node_position(socket.assigns.graph, node_id, position) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info({:edge_created, %{user_id: user_id, edge: edge}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Add the edge to our graph
+      case FlowGraph.add_edge(
+             socket.assigns.graph,
+             edge.id,
+             edge.source,
+             edge.source_handle,
+             edge.target,
+             edge.target_handle
+           ) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info({:edge_deleted, %{user_id: user_id, edge_id: edge_id}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Delete the edge from our graph
+      case FlowGraph.delete_edge(socket.assigns.graph, edge_id) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
   def render(assigns) do
     nodes = nodes_for_ui(assigns.graph)
     edges = edges_for_ui(assigns.graph, nodes)
@@ -368,6 +576,29 @@ defmodule ExFlowGraphWeb.HomeLive do
                 <span class="badge badge-primary badge-lg">{@current_graph_name}</span>
               </div>
             </div>
+            
+            <%!-- Active Users --%>
+            <%= if map_size(@active_users) > 0 do %>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-base-content/50">Active Users:</span>
+                <div class="flex -space-x-2">
+                  <%= for {user_id, user_meta} <- @active_users do %>
+                    <div
+                      class="avatar placeholder tooltip"
+                      data-tip={user_meta.name}
+                      style={"border: 2px solid #{user_meta.color}"}
+                    >
+                      <div class="w-8 h-8 rounded-full" style={"background-color: #{user_meta.color}20"}>
+                        <span class="text-xs font-bold" style={"color: #{user_meta.color}"}>
+                          {String.slice(user_meta.name, 0..1) |> String.upcase()}
+                        </span>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+                <span class="badge badge-sm">{map_size(@active_users)}</span>
+              </div>
+            <% end %>
           </div>
         </div>
 
