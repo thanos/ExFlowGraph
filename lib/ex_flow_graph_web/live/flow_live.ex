@@ -47,9 +47,6 @@ defmodule ExFlowGraphWeb.FlowLive do
   def render(assigns) do
     nodes = nodes_for_ui(assigns.graph)
     edges = edges_for_ui(assigns.graph, nodes)
-    
-    IO.inspect(nodes, label: "NODES")
-    IO.inspect(edges, label: "EDGES")
 
     assigns = assign(assigns, nodes: nodes, edges: edges)
 
