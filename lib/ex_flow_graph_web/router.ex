@@ -17,8 +17,7 @@ defmodule ExFlowGraphWeb.Router do
   scope "/", ExFlowGraphWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
-    live "/flow", FlowLive
+    live "/", HomeLive
   end
 
   # Other scopes may use custom stacks.
