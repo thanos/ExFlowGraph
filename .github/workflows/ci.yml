@@ -59,6 +59,9 @@ jobs:
       - name: Ensure cache directories exist
         run: mkdir -p $(pwd)/deps $(pwd)/_build
         
+      - name: Debug cache paths
+        run: ls -al $(pwd)
+        
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
