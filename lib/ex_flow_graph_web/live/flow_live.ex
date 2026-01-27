@@ -88,7 +88,7 @@ defmodule ExFlowGraphWeb.FlowLive do
           <div>
             <h1 class="text-2xl font-semibold tracking-tight">ExFlow</h1>
             <p class="mt-1 text-sm text-base-content/70">
-              Hybrid canvas: HTML nodes + SVG edges. Drag nodes to move • Drag background to pan • Scroll to zoom
+              Drag nodes to reposition • Drag background to pan • Scroll to zoom • Drag from source handle (blue) to target handle (gray) to create edges
             </p>
           </div>
         </div>

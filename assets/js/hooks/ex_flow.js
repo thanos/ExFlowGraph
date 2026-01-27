@@ -261,9 +261,11 @@ export default {
     
     this.onEdgeCreationMove = this.onEdgeCreationMove.bind(this)
     this.onEdgeCreationEnd = this.onEdgeCreationEnd.bind(this)
+    this.onEdgeCreationCancel = this.onEdgeCreationCancel.bind(this)
     
     window.addEventListener("mousemove", this.onEdgeCreationMove)
     window.addEventListener("mouseup", this.onEdgeCreationEnd, { once: true })
+    window.addEventListener("keydown", this.onEdgeCreationCancel)
   },
   
   onEdgeCreationMove(e) {
@@ -311,7 +313,19 @@ export default {
     this.removeGhostEdge()
     this.removeTargetHighlights()
     window.removeEventListener("mousemove", this.onEdgeCreationMove)
+    window.removeEventListener("keydown", this.onEdgeCreationCancel)
     this.edgeCreation = null
+  },
+  
+  onEdgeCreationCancel(e) {
+    if (e.key === "Escape" && this.edgeCreation) {
+      this.removeGhostEdge()
+      this.removeTargetHighlights()
+      window.removeEventListener("mousemove", this.onEdgeCreationMove)
+      window.removeEventListener("mouseup", this.onEdgeCreationEnd)
+      window.removeEventListener("keydown", this.onEdgeCreationCancel)
+      this.edgeCreation = null
+    }
   },
   
   createGhostEdge() {
