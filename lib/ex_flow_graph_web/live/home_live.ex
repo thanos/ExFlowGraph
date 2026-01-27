@@ -376,9 +376,16 @@ defmodule ExFlowGraphWeb.HomeLive do
 
   @impl true
   def handle_event("undo", _params, socket) do
+    old_graph = socket.assigns.graph
+
     case ExFlow.HistoryManager.undo(socket.assigns.history, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast changes to other users
+        if socket.assigns.user_id do
+          broadcast_graph_diff(old_graph, graph, socket.assigns.user_id)
+        end
 
         socket =
           socket
@@ -397,9 +404,16 @@ defmodule ExFlowGraphWeb.HomeLive do
 
   @impl true
   def handle_event("redo", _params, socket) do
+    old_graph = socket.assigns.graph
+
     case ExFlow.HistoryManager.redo(socket.assigns.history, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast changes to other users
+        if socket.assigns.user_id do
+          broadcast_graph_diff(old_graph, graph, socket.assigns.user_id)
+        end
 
         socket =
           socket
@@ -1184,6 +1198,70 @@ defmodule ExFlowGraphWeb.HomeLive do
       <% end %>
     </div>
     """
+  end
+
+  # Helper function to broadcast graph differences after undo/redo
+  defp broadcast_graph_diff(old_graph, new_graph, user_id) do
+    old_nodes = FlowGraph.get_nodes(old_graph) |> Enum.map(& &1.id) |> MapSet.new()
+    new_nodes = FlowGraph.get_nodes(new_graph) |> Enum.map(& &1.id) |> MapSet.new()
+
+    old_edges = FlowGraph.get_edges(old_graph) |> Enum.map(& &1.id) |> MapSet.new()
+    new_edges = FlowGraph.get_edges(new_graph) |> Enum.map(& &1.id) |> MapSet.new()
+
+    # Broadcast added nodes
+    added_nodes = MapSet.difference(new_nodes, old_nodes)
+
+    Enum.each(added_nodes, fn node_id ->
+      case FlowGraph.get_node(new_graph, node_id) do
+        {:ok, node} ->
+          Collaboration.broadcast_node_created(@storage_id, user_id, node)
+
+        {:error, _} ->
+          :ok
+      end
+    end)
+
+    # Broadcast deleted nodes
+    deleted_nodes = MapSet.difference(old_nodes, new_nodes)
+
+    Enum.each(deleted_nodes, fn node_id ->
+      Collaboration.broadcast_node_deleted(@storage_id, user_id, node_id)
+    end)
+
+    # Broadcast moved nodes (nodes that exist in both but may have moved)
+    common_nodes = MapSet.intersection(old_nodes, new_nodes)
+
+    Enum.each(common_nodes, fn node_id ->
+      with {:ok, old_node} <- FlowGraph.get_node(old_graph, node_id),
+           {:ok, new_node} <- FlowGraph.get_node(new_graph, node_id) do
+        if old_node.position != new_node.position do
+          Collaboration.broadcast_node_moved(@storage_id, user_id, node_id, new_node.position)
+        end
+      end
+    end)
+
+    # Broadcast added edges
+    added_edges = MapSet.difference(new_edges, old_edges)
+
+    Enum.each(added_edges, fn edge_id ->
+      new_graph
+      |> FlowGraph.get_edges()
+      |> Enum.find(fn edge -> edge.id == edge_id end)
+      |> case do
+        nil ->
+          :ok
+
+        edge ->
+          Collaboration.broadcast_edge_created(@storage_id, user_id, edge)
+      end
+    end)
+
+    # Broadcast deleted edges
+    deleted_edges = MapSet.difference(old_edges, new_edges)
+
+    Enum.each(deleted_edges, fn edge_id ->
+      Collaboration.broadcast_edge_deleted(@storage_id, user_id, edge_id)
+    end)
   end
 
   defp create_demo_graph do
