@@ -46,7 +46,7 @@ defmodule ExFlowGraphWeb.Live.Collaboration do
   @doc """
   Tracks a user's presence in a graph session.
   """
-  def track_user(socket, graph_id, user_id, user_meta) do
+  def track_user(socket, _graph_id, user_id, user_meta) do
     Presence.track(socket, user_id, user_meta)
   end
 

@@ -431,7 +431,7 @@ defmodule ExFlowGraphWeb.HomeLive do
   end
 
   @impl true
-  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: diff}, socket) do
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: _diff}, socket) do
     # Update active users list
     active_users =
       Presence.list(Collaboration.graph_topic(@storage_id))
