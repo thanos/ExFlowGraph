@@ -22,9 +22,10 @@ defmodule ExFlowGraphWeb.HomeLive do
       socket
       |> assign(:graph, graph)
       |> assign(:selected_node_type, :task)
-      |> assign(:graph_name, @storage_id)
+      |> assign(:current_graph_name, @storage_id)
       |> assign(:saved_graphs, InMemory.list())
       |> assign(:show_save_modal, false)
+      |> assign(:show_save_as_modal, false)
       |> assign(:show_load_modal, false)
       |> assign(:show_help, false)
 
@@ -114,13 +115,29 @@ defmodule ExFlowGraphWeb.HomeLive do
   end
 
   @impl true
-  def handle_event("save_graph", %{"name" => name}, socket) do
+  def handle_event("save_graph", _params, socket) do
+    # Save updates the current graph
+    name = socket.assigns.current_graph_name
     :ok = InMemory.save(name, socket.assigns.graph)
 
     socket =
       socket
       |> assign(:saved_graphs, InMemory.list())
-      |> assign(:show_save_modal, false)
+      |> put_flash(:info, "Graph '#{name}' updated")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("save_as_graph", %{"name" => name}, socket) do
+    # Save As creates a new copy with a different name
+    :ok = InMemory.save(name, socket.assigns.graph)
+
+    socket =
+      socket
+      |> assign(:current_graph_name, name)
+      |> assign(:saved_graphs, InMemory.list())
+      |> assign(:show_save_as_modal, false)
       |> put_flash(:info, "Graph saved as '#{name}'")
 
     {:noreply, socket}
@@ -135,6 +152,7 @@ defmodule ExFlowGraphWeb.HomeLive do
         socket =
           socket
           |> assign(:graph, graph)
+          |> assign(:current_graph_name, name)
           |> assign(:show_load_modal, false)
           |> put_flash(:info, "Graph '#{name}' loaded")
 
@@ -160,6 +178,11 @@ defmodule ExFlowGraphWeb.HomeLive do
   @impl true
   def handle_event("toggle_save_modal", _params, socket) do
     {:noreply, assign(socket, :show_save_modal, !socket.assigns.show_save_modal)}
+  end
+
+  @impl true
+  def handle_event("toggle_save_as_modal", _params, socket) do
+    {:noreply, assign(socket, :show_save_as_modal, !socket.assigns.show_save_as_modal)}
   end
 
   @impl true
@@ -192,80 +215,14 @@ defmodule ExFlowGraphWeb.HomeLive do
               <p class="mt-2 text-base-content/70">
                 Visual workflow editor with drag-and-drop nodes, pan/zoom, and database persistence
               </p>
+              <div class="mt-2 flex items-center gap-2">
+                <span class="text-sm text-base-content/50">Current Graph:</span>
+                <span class="badge badge-primary badge-lg">{@current_graph_name}</span>
+              </div>
             </div>
-            <button
-              phx-click="toggle_help"
-              class="btn btn-circle btn-ghost"
-              title="Help & Features"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-                class="w-6 h-6"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"
-                />
-              </svg>
-            </button>
           </div>
         </div>
 
-        <%!-- Help Panel --%>
-        <%= if @show_help do %>
-          <div class="mb-6 rounded-2xl border border-primary/20 bg-base-100 p-6 shadow-lg">
-            <div class="flex items-start justify-between">
-              <div class="flex-1">
-                <h2 class="text-xl font-semibold mb-4">Features & Controls</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h3 class="font-medium text-primary mb-2">Canvas Controls</h3>
-                    <ul class="space-y-1 text-sm text-base-content/70">
-                      <li>• Drag nodes to reposition</li>
-                      <li>• Drag background to pan</li>
-                      <li>• Scroll to zoom in/out</li>
-                      <li>• Zoom centers on cursor</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h3 class="font-medium text-primary mb-2">Edge Creation</h3>
-                    <ul class="space-y-1 text-sm text-base-content/70">
-                      <li>• Drag from blue handle (source)</li>
-                      <li>• Drop on gray handle (target)</li>
-                      <li>• Press Escape to cancel</li>
-                      <li>• Edges follow nodes</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h3 class="font-medium text-primary mb-2">Node Management</h3>
-                    <ul class="space-y-1 text-sm text-base-content/70">
-                      <li>• Add Task or Agent nodes</li>
-                      <li>• Delete nodes (removes edges)</li>
-                      <li>• Nodes persist on reload</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h3 class="font-medium text-primary mb-2">Graph Persistence</h3>
-                    <ul class="space-y-1 text-sm text-base-content/70">
-                      <li>• Auto-saves to memory</li>
-                      <li>• Save named versions</li>
-                      <li>• Load previous graphs</li>
-                      <li>• Database-ready (Ecto adapter)</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-              <button phx-click="toggle_help" class="btn btn-sm btn-circle btn-ghost">
-                ✕
-              </button>
-            </div>
-          </div>
-        <% end %>
 
         <%!-- Toolbar --%>
         <div class="mb-6 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
@@ -321,7 +278,7 @@ defmodule ExFlowGraphWeb.HomeLive do
 
             <%!-- Graph Actions --%>
             <div class="flex items-center gap-2">
-              <button phx-click="toggle_save_modal" class="btn btn-sm btn-outline gap-2">
+              <button phx-click="save_graph" class="btn btn-sm btn-primary gap-2">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -337,6 +294,23 @@ defmodule ExFlowGraphWeb.HomeLive do
                   />
                 </svg>
                 Save
+              </button>
+              <button phx-click="toggle_save_as_modal" class="btn btn-sm btn-outline gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-4 h-4"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                  />
+                </svg>
+                Save As
               </button>
               <button phx-click="toggle_load_modal" class="btn btn-sm btn-outline gap-2">
                 <svg
@@ -432,35 +406,192 @@ defmodule ExFlowGraphWeb.HomeLive do
             </div>
           </div>
         <% end %>
+
+        <%!-- Comprehensive Feature Guide --%>
+        <div class="mt-6 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-sm">
+          <h2 class="text-2xl font-bold mb-6">Feature Guide & Documentation</h2>
+          
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <%!-- Canvas Controls --%>
+            <div>
+              <h3 class="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
+                </svg>
+                Canvas Controls
+              </h3>
+              <div class="space-y-3">
+                <div class="pl-4 border-l-2 border-primary/30">
+                  <h4 class="font-medium mb-1">Pan the Canvas</h4>
+                  <p class="text-sm text-base-content/70">Click and drag on the background to move the entire canvas. Perfect for navigating large workflows.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-primary/30">
+                  <h4 class="font-medium mb-1">Zoom In/Out</h4>
+                  <p class="text-sm text-base-content/70">Use your mouse wheel to zoom. The zoom centers on your cursor position for precise navigation.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-primary/30">
+                  <h4 class="font-medium mb-1">Move Nodes</h4>
+                  <p class="text-sm text-base-content/70">Click and drag any node to reposition it. Connected edges automatically follow the node.</p>
+                </div>
+              </div>
+            </div>
+
+            <%!-- Node Management --%>
+            <div>
+              <h3 class="text-lg font-semibold text-secondary mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                </svg>
+                Node Management
+              </h3>
+              <div class="space-y-3">
+                <div class="pl-4 border-l-2 border-secondary/30">
+                  <h4 class="font-medium mb-1">Add Nodes</h4>
+                  <p class="text-sm text-base-content/70">Click "Add Task" or "Add Agent" in the toolbar. New nodes appear at random positions and can be dragged immediately.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-secondary/30">
+                  <h4 class="font-medium mb-1">Delete Nodes</h4>
+                  <p class="text-sm text-base-content/70">Click the ✕ button on any node in the node list. Deleting a node automatically removes all connected edges.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-secondary/30">
+                  <h4 class="font-medium mb-1">Node Types</h4>
+                  <p class="text-sm text-base-content/70"><span class="badge badge-primary badge-sm">Task</span> nodes represent work items. <span class="badge badge-secondary badge-sm">Agent</span> nodes represent actors or services.</p>
+                </div>
+              </div>
+            </div>
+
+            <%!-- Edge Creation --%>
+            <div>
+              <h3 class="text-lg font-semibold text-accent mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                </svg>
+                Edge Creation
+              </h3>
+              <div class="space-y-3">
+                <div class="pl-4 border-l-2 border-accent/30">
+                  <h4 class="font-medium mb-1">Drag to Connect</h4>
+                  <p class="text-sm text-base-content/70">Click and drag from a <span class="text-primary font-medium">blue handle</span> (source) to a <span class="text-base-content/50 font-medium">gray handle</span> (target) to create an edge.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-accent/30">
+                  <h4 class="font-medium mb-1">Visual Feedback</h4>
+                  <p class="text-sm text-base-content/70">While dragging, you'll see a dashed "ghost edge" following your cursor. Compatible target handles are highlighted.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-accent/30">
+                  <h4 class="font-medium mb-1">Cancel Creation</h4>
+                  <p class="text-sm text-base-content/70">Press <kbd class="kbd kbd-xs">Escape</kbd> or release outside a valid target to cancel edge creation.</p>
+                </div>
+              </div>
+            </div>
+
+            <%!-- Graph Persistence --%>
+            <div>
+              <h3 class="text-lg font-semibold text-info mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                </svg>
+                Graph Persistence
+              </h3>
+              <div class="space-y-3">
+                <div class="pl-4 border-l-2 border-info/30">
+                  <h4 class="font-medium mb-1">Auto-Save</h4>
+                  <p class="text-sm text-base-content/70">Every change (node move, add, delete, edge creation) is automatically saved to memory.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-info/30">
+                  <h4 class="font-medium mb-1">Save & Save As</h4>
+                  <p class="text-sm text-base-content/70"><span class="badge badge-primary badge-sm">Save</span> updates the current graph. <span class="badge badge-outline badge-sm">Save As</span> creates a new copy with a different name.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-info/30">
+                  <h4 class="font-medium mb-1">Load Graphs</h4>
+                  <p class="text-sm text-base-content/70">Click "Load" to browse and load any previously saved graph. The current graph is replaced.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <%!-- Technical Details --%>
+          <div class="mt-8 pt-8 border-t border-base-300">
+            <h3 class="text-lg font-semibold mb-4">Technical Architecture</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="space-y-2">
+                <h4 class="font-medium text-sm">Frontend</h4>
+                <ul class="text-sm text-base-content/70 space-y-1">
+                  <li>• Phoenix LiveView</li>
+                  <li>• JavaScript Hooks</li>
+                  <li>• SVG + HTML rendering</li>
+                  <li>• Zero-latency interactions</li>
+                </ul>
+              </div>
+              <div class="space-y-2">
+                <h4 class="font-medium text-sm">Backend</h4>
+                <ul class="text-sm text-base-content/70 space-y-1">
+                  <li>• LibGraph (immutable graphs)</li>
+                  <li>• Pluggable storage adapters</li>
+                  <li>• InMemory & Ecto adapters</li>
+                  <li>• Optimistic locking</li>
+                </ul>
+              </div>
+              <div class="space-y-2">
+                <h4 class="font-medium text-sm">Features</h4>
+                <ul class="text-sm text-base-content/70 space-y-1">
+                  <li>• Drag-and-drop nodes</li>
+                  <li>• Pan/zoom canvas</li>
+                  <li>• Edge creation</li>
+                  <li>• Database persistence</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <%!-- Quick Tips --%>
+          <div class="mt-6 rounded-lg bg-primary/5 p-4 border border-primary/20">
+            <h4 class="font-semibold text-sm mb-2 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+              </svg>
+              Pro Tips
+            </h4>
+            <ul class="text-sm text-base-content/70 space-y-1">
+              <li>• Hold <kbd class="kbd kbd-xs">Shift</kbd> while dragging for precise node placement</li>
+              <li>• Use the node list to quickly find and delete specific nodes</li>
+              <li>• Create multiple named graphs to organize different workflows</li>
+              <li>• The current graph name is shown in the header badge</li>
+              <li>• All changes persist across page reloads</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
-      <%!-- Save Modal --%>
-      <%= if @show_save_modal do %>
+      <%!-- Save As Modal --%>
+      <%= if @show_save_as_modal do %>
         <div class="modal modal-open">
           <div class="modal-box">
-            <h3 class="font-bold text-lg mb-4">Save Graph</h3>
-            <form phx-submit="save_graph">
+            <h3 class="font-bold text-lg mb-4">Save Graph As</h3>
+            <p class="text-sm text-base-content/70 mb-4">
+              Create a copy of the current graph with a new name.
+            </p>
+            <form phx-submit="save_as_graph">
               <div class="form-control">
                 <label class="label">
-                  <span class="label-text">Graph Name</span>
+                  <span class="label-text">New Graph Name</span>
                 </label>
                 <input
                   type="text"
                   name="name"
-                  placeholder="my-workflow"
+                  placeholder="my-workflow-v2"
                   class="input input-bordered"
                   required
                 />
               </div>
               <div class="modal-action">
-                <button type="button" phx-click="toggle_save_modal" class="btn btn-ghost">
+                <button type="button" phx-click="toggle_save_as_modal" class="btn btn-ghost">
                   Cancel
                 </button>
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-primary">Save As</button>
               </div>
             </form>
           </div>
-          <div class="modal-backdrop" phx-click="toggle_save_modal"></div>
+          <div class="modal-backdrop" phx-click="toggle_save_as_modal"></div>
         </div>
       <% end %>
 
@@ -472,7 +603,7 @@ defmodule ExFlowGraphWeb.HomeLive do
             <%= if length(@saved_graphs) > 0 do %>
               <div class="space-y-2">
                 <%= for graph_name <- @saved_graphs do %>
-                  <%= if graph_name != @storage_id do %>
+                  <%= if graph_name != @current_graph_name do %>
                     <div class="flex items-center justify-between rounded-lg border border-base-300 bg-base-200/50 px-4 py-3">
                       <span class="font-medium">{graph_name}</span>
                       <div class="flex gap-2">
