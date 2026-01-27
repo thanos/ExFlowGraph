@@ -18,7 +18,12 @@ defmodule ExFlow.Commands.DeleteNodeCommand do
 
   def new(node_id, graph) do
     # Capture node data and connected edges before deletion
-    node_data = Graph.get_node(graph, node_id)
+    node_data =
+      case Graph.get_node(graph, node_id) do
+        {:ok, node} -> node
+        {:error, _} -> nil
+      end
+
     connected_edges = get_connected_edges(graph, node_id)
 
     %__MODULE__{
@@ -35,16 +40,27 @@ defmodule ExFlow.Commands.DeleteNodeCommand do
 
   @impl ExFlow.Command
   def undo(%__MODULE__{} = cmd, graph) do
-    # Restore the node
-    with {:ok, graph} <-
-           Graph.add_node(
-             graph,
-             cmd.node_id,
-             cmd.node_data.type,
-             cmd.node_data.metadata
-           ) do
-      # Restore connected edges
-      restore_edges(graph, cmd.connected_edges)
+    # Safety check: ensure we have node data
+    if cmd.node_data == nil do
+      {:error, :no_node_data}
+    else
+      # Restore the node with proper metadata structure
+      # add_node expects metadata to have :position and :metadata keys
+      metadata_map = %{
+        position: cmd.node_data.position,
+        metadata: cmd.node_data.metadata
+      }
+
+      with {:ok, graph} <-
+             Graph.add_node(
+               graph,
+               cmd.node_id,
+               cmd.node_data.type,
+               metadata_map
+             ) do
+        # Restore connected edges
+        restore_edges(graph, cmd.connected_edges || [])
+      end
     end
   end
 
