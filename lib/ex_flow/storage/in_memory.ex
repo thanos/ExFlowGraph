@@ -22,4 +22,21 @@ defmodule ExFlow.Storage.InMemory do
     Agent.update(__MODULE__, &Map.put(&1, id, graph))
     :ok
   end
+
+  @impl true
+  def delete(id) do
+    Agent.get_and_update(__MODULE__, fn state ->
+      case Map.has_key?(state, id) do
+        true -> {:ok, Map.delete(state, id)}
+        false -> {{:error, :not_found}, state}
+      end
+    end)
+  end
+
+  @impl true
+  def list do
+    Agent.get(__MODULE__, fn state ->
+      Map.keys(state)
+    end)
+  end
 end
