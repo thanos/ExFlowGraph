@@ -47,6 +47,9 @@ defmodule ExFlowGraphWeb.FlowLive do
   def render(assigns) do
     nodes = nodes_for_ui(assigns.graph)
     edges = edges_for_ui(assigns.graph, nodes)
+    
+    IO.inspect(nodes, label: "NODES")
+    IO.inspect(edges, label: "EDGES")
 
     assigns = assign(assigns, nodes: nodes, edges: edges)
 
@@ -95,10 +98,11 @@ defmodule ExFlowGraphWeb.FlowLive do
   defp edges_for_ui(%LibGraph{} = graph, nodes) do
     node_by_id = Map.new(nodes, fn n -> {n.id, n} end)
 
-    for edge <- FlowGraph.get_edges(graph) do
-      source = Map.get(node_by_id, edge.source)
-      target = Map.get(node_by_id, edge.target)
-
+    for edge <- FlowGraph.get_edges(graph),
+        source = Map.get(node_by_id, edge.source),
+        target = Map.get(node_by_id, edge.target),
+        source != nil,
+        target != nil do
       %{
         id: edge.id,
         source_id: edge.source,
