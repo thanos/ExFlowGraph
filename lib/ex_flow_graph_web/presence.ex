@@ -1,7 +1,7 @@
 defmodule ExFlowGraphWeb.Presence do
   @moduledoc """
   Tracks presence of users in graph editing sessions.
-  
+
   Each user is tracked with:
   - user_id: unique identifier
   - name: display name

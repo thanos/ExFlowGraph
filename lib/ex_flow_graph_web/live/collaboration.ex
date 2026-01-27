@@ -1,7 +1,7 @@
 defmodule ExFlowGraphWeb.Live.Collaboration do
   @moduledoc """
   Handles real-time collaboration features for graph editing.
-  
+
   Provides functions for:
   - PubSub topic management
   - Broadcasting graph changes
