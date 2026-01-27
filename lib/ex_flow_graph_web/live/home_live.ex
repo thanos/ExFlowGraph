@@ -263,23 +263,36 @@ defmodule ExFlowGraphWeb.HomeLive do
   def handle_event("delete_selected", _params, socket) do
     selected_ids = MapSet.to_list(socket.assigns.selected_node_ids)
 
-    graph =
-      Enum.reduce(selected_ids, socket.assigns.graph, fn id, acc_graph ->
-        case FlowGraph.delete_node(acc_graph, id) do
-          {:ok, new_graph} -> new_graph
-          {:error, _} -> acc_graph
+    # Delete each node using commands so they can be undone
+    result =
+      Enum.reduce_while(selected_ids, {:ok, socket.assigns.history, socket.assigns.graph}, fn id,
+                                                                                                {:ok,
+                                                                                                 acc_history,
+                                                                                                 acc_graph} ->
+        command = ExFlow.Commands.DeleteNodeCommand.new(id, acc_graph)
+
+        case ExFlow.HistoryManager.execute(acc_history, command, acc_graph) do
+          {:ok, new_history, new_graph} -> {:cont, {:ok, new_history, new_graph}}
+          {:error, reason} -> {:halt, {:error, reason}}
         end
       end)
 
-    :ok = InMemory.save(@storage_id, graph)
+    case result do
+      {:ok, history, graph} ->
+        :ok = InMemory.save(@storage_id, graph)
 
-    socket =
-      socket
-      |> assign(:graph, graph)
-      |> assign(:selected_node_ids, MapSet.new())
-      |> put_flash(:info, "Deleted #{length(selected_ids)} node(s)")
+        socket =
+          socket
+          |> assign(:graph, graph)
+          |> assign(:history, history)
+          |> assign(:selected_node_ids, MapSet.new())
+          |> put_flash(:info, "Deleted #{length(selected_ids)} node(s)")
 
-    {:noreply, socket}
+        {:noreply, socket}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete nodes")}
+    end
   end
 
   @impl true
