@@ -1,8 +1,13 @@
 defmodule ExFlowGraphWeb.HomeLive do
   use ExFlowGraphWeb, :live_view
 
+  alias ExFlow.Commands.CreateEdgeCommand
+  alias ExFlow.Commands.CreateNodeCommand
+  alias ExFlow.Commands.DeleteNodeCommand
   alias ExFlow.Core.Graph, as: FlowGraph
   alias ExFlow.Storage.InMemory
+  alias ExFlowGraphWeb.Live.Collaboration
+  alias ExFlowGraphWeb.Presence
 
   @storage_id "demo-graph"
 
@@ -18,6 +23,30 @@ defmodule ExFlowGraphWeb.HomeLive do
           create_demo_graph()
       end
 
+    # Set up collaboration
+    {user_id, user_color} =
+      if connected?(socket) do
+        Collaboration.subscribe(@storage_id)
+
+        # Generate user identity
+        user_id = Collaboration.get_user_id(socket)
+        user_color = Collaboration.generate_user_color()
+
+        # Track presence
+        {:ok, _} =
+          Presence.track(self(), Collaboration.graph_topic(@storage_id), user_id, %{
+            name: "User #{String.slice(user_id, -4..-1)}",
+            color: user_color,
+            cursor: %{x: 0, y: 0},
+            locked_nodes: [],
+            online_at: System.system_time(:second)
+          })
+
+        {user_id, user_color}
+      else
+        {nil, nil}
+      end
+
     socket =
       socket
       |> assign(:graph, graph)
@@ -30,15 +59,28 @@ defmodule ExFlowGraphWeb.HomeLive do
       |> assign(:show_help, false)
       |> assign(:selected_node_ids, MapSet.new())
       |> assign(:history, ExFlow.HistoryManager.new())
+      |> assign(:user_id, user_id)
+      |> assign(:user_color, user_color)
+      |> assign(:active_users, %{})
+      |> assign(:remote_cursors, %{})
+      |> assign(:locked_nodes, MapSet.new())
 
     {:ok, socket}
   end
 
   @impl true
   def handle_event("update_position", %{"id" => id, "x" => x, "y" => y}, socket) do
-    case FlowGraph.update_node_position(socket.assigns.graph, id, %{x: round(x), y: round(y)}) do
+    position = %{x: round(x), y: round(y)}
+
+    case FlowGraph.update_node_position(socket.assigns.graph, id, position) do
       {:ok, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast to other users
+        if socket.assigns.user_id do
+          Collaboration.broadcast_node_moved(@storage_id, socket.assigns.user_id, id, position)
+        end
+
         {:noreply, assign(socket, :graph, graph)}
 
       {:error, _reason} ->
@@ -60,7 +102,7 @@ defmodule ExFlowGraphWeb.HomeLive do
     edge_id = "edge-#{System.unique_integer([:positive])}"
 
     command =
-      ExFlow.Commands.CreateEdgeCommand.new(
+      CreateEdgeCommand.new(
         edge_id,
         source_id,
         source_handle,
@@ -71,6 +113,20 @@ defmodule ExFlowGraphWeb.HomeLive do
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast to other users
+        if socket.assigns.user_id do
+          edge = %{
+            id: edge_id,
+            source: source_id,
+            source_handle: source_handle,
+            target: target_id,
+            target_handle: target_handle
+          }
+
+          Collaboration.broadcast_edge_created(@storage_id, socket.assigns.user_id, edge)
+        end
+
         {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
@@ -88,11 +144,18 @@ defmodule ExFlowGraphWeb.HomeLive do
     y = :rand.uniform(300) + 50
 
     command =
-      ExFlow.Commands.CreateNodeCommand.new(node_id, node_type, %{position: %{x: x, y: y}})
+      CreateNodeCommand.new(node_id, node_type, %{position: %{x: x, y: y}})
 
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast to other users
+        if socket.assigns.user_id do
+          {:ok, node} = FlowGraph.get_node(graph, node_id)
+          Collaboration.broadcast_node_created(@storage_id, socket.assigns.user_id, node)
+        end
+
         {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
@@ -102,11 +165,17 @@ defmodule ExFlowGraphWeb.HomeLive do
 
   @impl true
   def handle_event("delete_node", %{"id" => id}, socket) do
-    command = ExFlow.Commands.DeleteNodeCommand.new(id, socket.assigns.graph)
+    command = DeleteNodeCommand.new(id, socket.assigns.graph)
 
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast to other users
+        if socket.assigns.user_id do
+          Collaboration.broadcast_node_deleted(@storage_id, socket.assigns.user_id, id)
+        end
+
         {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
@@ -263,23 +332,43 @@ defmodule ExFlowGraphWeb.HomeLive do
   def handle_event("delete_selected", _params, socket) do
     selected_ids = MapSet.to_list(socket.assigns.selected_node_ids)
 
-    graph =
-      Enum.reduce(selected_ids, socket.assigns.graph, fn id, acc_graph ->
-        case FlowGraph.delete_node(acc_graph, id) do
-          {:ok, new_graph} -> new_graph
-          {:error, _} -> acc_graph
+    # Delete each node using commands so they can be undone
+    result =
+      Enum.reduce_while(selected_ids, {:ok, socket.assigns.history, socket.assigns.graph}, fn id,
+                                                                                              {:ok,
+                                                                                               acc_history,
+                                                                                               acc_graph} ->
+        command = DeleteNodeCommand.new(id, acc_graph)
+
+        case ExFlow.HistoryManager.execute(acc_history, command, acc_graph) do
+          {:ok, new_history, new_graph} -> {:cont, {:ok, new_history, new_graph}}
+          {:error, reason} -> {:halt, {:error, reason}}
         end
       end)
 
-    :ok = InMemory.save(@storage_id, graph)
+    case result do
+      {:ok, history, graph} ->
+        :ok = InMemory.save(@storage_id, graph)
 
-    socket =
-      socket
-      |> assign(:graph, graph)
-      |> assign(:selected_node_ids, MapSet.new())
-      |> put_flash(:info, "Deleted #{length(selected_ids)} node(s)")
+        # Broadcast deletions to other users
+        if socket.assigns.user_id do
+          Enum.each(selected_ids, fn id ->
+            Collaboration.broadcast_node_deleted(@storage_id, socket.assigns.user_id, id)
+          end)
+        end
 
-    {:noreply, socket}
+        socket =
+          socket
+          |> assign(:graph, graph)
+          |> assign(:history, history)
+          |> assign(:selected_node_ids, MapSet.new())
+          |> put_flash(:info, "Deleted #{length(selected_ids)} node(s)")
+
+        {:noreply, socket}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete nodes")}
+    end
   end
 
   @impl true
@@ -290,9 +379,16 @@ defmodule ExFlowGraphWeb.HomeLive do
 
   @impl true
   def handle_event("undo", _params, socket) do
+    old_graph = socket.assigns.graph
+
     case ExFlow.HistoryManager.undo(socket.assigns.history, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast changes to other users
+        if socket.assigns.user_id do
+          broadcast_graph_diff(old_graph, graph, socket.assigns.user_id)
+        end
 
         socket =
           socket
@@ -311,9 +407,16 @@ defmodule ExFlowGraphWeb.HomeLive do
 
   @impl true
   def handle_event("redo", _params, socket) do
+    old_graph = socket.assigns.graph
+
     case ExFlow.HistoryManager.redo(socket.assigns.history, socket.assigns.graph) do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
+
+        # Broadcast changes to other users
+        if socket.assigns.user_id do
+          broadcast_graph_diff(old_graph, graph, socket.assigns.user_id)
+        end
 
         socket =
           socket
@@ -327,6 +430,151 @@ defmodule ExFlowGraphWeb.HomeLive do
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to redo")}
+    end
+  end
+
+  @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: _diff}, socket) do
+    # Update active users list
+    active_users =
+      Presence.list(Collaboration.graph_topic(@storage_id))
+      |> Enum.into(%{}, fn {user_id, %{metas: [meta | _]}} ->
+        {user_id, meta}
+      end)
+
+    {:noreply, assign(socket, :active_users, active_users)}
+  end
+
+  @impl true
+  def handle_info({:cursor_moved, %{user_id: user_id, x: x, y: y}}, socket) do
+    # Don't process our own cursor
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      remote_cursors = Map.put(socket.assigns.remote_cursors, user_id, %{x: x, y: y})
+      {:noreply, assign(socket, :remote_cursors, remote_cursors)}
+    end
+  end
+
+  @impl true
+  def handle_info({:node_locked, %{user_id: user_id, node_id: node_id}}, socket) do
+    # Don't process our own locks
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      locked_nodes = MapSet.put(socket.assigns.locked_nodes, node_id)
+      {:noreply, assign(socket, :locked_nodes, locked_nodes)}
+    end
+  end
+
+  @impl true
+  def handle_info({:node_unlocked, %{user_id: user_id, node_id: node_id}}, socket) do
+    # Don't process our own unlocks
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      locked_nodes = MapSet.delete(socket.assigns.locked_nodes, node_id)
+      {:noreply, assign(socket, :locked_nodes, locked_nodes)}
+    end
+  end
+
+  @impl true
+  def handle_info({:node_created, %{user_id: user_id, node: node}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Add the node to our graph
+      case FlowGraph.add_node(
+             socket.assigns.graph,
+             node.id,
+             node.type,
+             %{position: node.position, metadata: node.metadata}
+           ) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info({:node_deleted, %{user_id: user_id, node_id: node_id}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Delete the node from our graph
+      case FlowGraph.delete_node(socket.assigns.graph, node_id) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {:node_moved, %{user_id: user_id, node_id: node_id, position: position}},
+        socket
+      ) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Update the node position in our graph
+      case FlowGraph.update_node_position(socket.assigns.graph, node_id, position) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info({:edge_created, %{user_id: user_id, edge: edge}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Add the edge to our graph
+      case FlowGraph.add_edge(
+             socket.assigns.graph,
+             edge.id,
+             edge.source,
+             edge.source_handle,
+             edge.target,
+             edge.target_handle
+           ) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_info({:edge_deleted, %{user_id: user_id, edge_id: edge_id}}, socket) do
+    # Don't process our own changes
+    if user_id == socket.assigns.user_id do
+      {:noreply, socket}
+    else
+      # Delete the edge from our graph
+      case FlowGraph.delete_edge(socket.assigns.graph, edge_id) do
+        {:ok, graph} ->
+          {:noreply, assign(socket, :graph, graph)}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
     end
   end
 
@@ -355,9 +603,34 @@ defmodule ExFlowGraphWeb.HomeLive do
                 <span class="badge badge-primary badge-lg">{@current_graph_name}</span>
               </div>
             </div>
+
+            <%!-- Active Users --%>
+            <%= if map_size(@active_users) > 0 do %>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-base-content/50">Active Users:</span>
+                <div class="flex -space-x-2">
+                  <%= for {user_id, user_meta} <- @active_users do %>
+                    <div
+                      class="avatar placeholder tooltip"
+                      data-tip={user_meta.name}
+                      style={"border: 2px solid #{user_meta.color}"}
+                    >
+                      <div
+                        class="w-8 h-8 rounded-full"
+                        style={"background-color: #{user_meta.color}20"}
+                      >
+                        <span class="text-xs font-bold" style={"color: #{user_meta.color}"}>
+                          {String.slice(user_meta.name, 0..1) |> String.upcase()}
+                        </span>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+                <span class="badge badge-sm">{map_size(@active_users)}</span>
+              </div>
+            <% end %>
           </div>
         </div>
-
 
         <%!-- Toolbar --%>
         <div class="mb-6 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
@@ -649,28 +922,45 @@ defmodule ExFlowGraphWeb.HomeLive do
         <%!-- Comprehensive Feature Guide --%>
         <div class="mt-6 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-sm">
           <h2 class="text-2xl font-bold mb-6">Feature Guide & Documentation</h2>
-          
+
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <%!-- Canvas Controls --%>
             <div>
               <h3 class="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59"
+                  />
                 </svg>
                 Canvas Controls
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-primary/30">
                   <h4 class="font-medium mb-1">Pan the Canvas</h4>
-                  <p class="text-sm text-base-content/70">Click and drag on the background to move the entire canvas. Perfect for navigating large workflows.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click and drag on the background to move the entire canvas. Perfect for navigating large workflows.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-primary/30">
                   <h4 class="font-medium mb-1">Zoom In/Out</h4>
-                  <p class="text-sm text-base-content/70">Use your mouse wheel to zoom. The zoom centers on your cursor position for precise navigation.</p>
+                  <p class="text-sm text-base-content/70">
+                    Use your mouse wheel to zoom. The zoom centers on your cursor position for precise navigation.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-primary/30">
                   <h4 class="font-medium mb-1">Move Nodes</h4>
-                  <p class="text-sm text-base-content/70">Click and drag any node to reposition it. Connected edges automatically follow the node.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click and drag any node to reposition it. Connected edges automatically follow the node.
+                  </p>
                 </div>
               </div>
             </div>
@@ -678,23 +968,43 @@ defmodule ExFlowGraphWeb.HomeLive do
             <%!-- Node Management --%>
             <div>
               <h3 class="text-lg font-semibold text-secondary mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                  />
                 </svg>
                 Node Management
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-secondary/30">
                   <h4 class="font-medium mb-1">Add Nodes</h4>
-                  <p class="text-sm text-base-content/70">Click "Add Task" or "Add Agent" in the toolbar. New nodes appear at random positions and can be dragged immediately.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click "Add Task" or "Add Agent" in the toolbar. New nodes appear at random positions and can be dragged immediately.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-secondary/30">
                   <h4 class="font-medium mb-1">Delete Nodes</h4>
-                  <p class="text-sm text-base-content/70">Click the ✕ button on any node in the node list. Deleting a node automatically removes all connected edges.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click the ✕ button on any node in the node list. Deleting a node automatically removes all connected edges.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-secondary/30">
                   <h4 class="font-medium mb-1">Node Types</h4>
-                  <p class="text-sm text-base-content/70"><span class="badge badge-primary badge-sm">Task</span> nodes represent work items. <span class="badge badge-secondary badge-sm">Agent</span> nodes represent actors or services.</p>
+                  <p class="text-sm text-base-content/70">
+                    <span class="badge badge-primary badge-sm">Task</span>
+                    nodes represent work items.
+                    <span class="badge badge-secondary badge-sm">Agent</span>
+                    nodes represent actors or services.
+                  </p>
                 </div>
               </div>
             </div>
@@ -702,23 +1012,43 @@ defmodule ExFlowGraphWeb.HomeLive do
             <%!-- Edge Creation --%>
             <div>
               <h3 class="text-lg font-semibold text-accent mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
+                  />
                 </svg>
                 Edge Creation
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-accent/30">
                   <h4 class="font-medium mb-1">Drag to Connect</h4>
-                  <p class="text-sm text-base-content/70">Click and drag from a <span class="text-primary font-medium">blue handle</span> (source) to a <span class="text-base-content/50 font-medium">gray handle</span> (target) to create an edge.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click and drag from a <span class="text-primary font-medium">blue handle</span>
+                    (source) to a <span class="text-base-content/50 font-medium">gray handle</span>
+                    (target) to create an edge.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-accent/30">
                   <h4 class="font-medium mb-1">Visual Feedback</h4>
-                  <p class="text-sm text-base-content/70">While dragging, you'll see a dashed "ghost edge" following your cursor. Compatible target handles are highlighted.</p>
+                  <p class="text-sm text-base-content/70">
+                    While dragging, you'll see a dashed "ghost edge" following your cursor. Compatible target handles are highlighted.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-accent/30">
                   <h4 class="font-medium mb-1">Cancel Creation</h4>
-                  <p class="text-sm text-base-content/70">Press <kbd class="kbd kbd-xs">Escape</kbd> or release outside a valid target to cancel edge creation.</p>
+                  <p class="text-sm text-base-content/70">
+                    Press <kbd class="kbd kbd-xs">Escape</kbd>
+                    or release outside a valid target to cancel edge creation.
+                  </p>
                 </div>
               </div>
             </div>
@@ -726,26 +1056,42 @@ defmodule ExFlowGraphWeb.HomeLive do
             <%!-- Undo/Redo --%>
             <div>
               <h3 class="text-lg font-semibold text-warning mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+                  />
                 </svg>
                 Undo/Redo
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-warning/30">
                   <h4 class="font-medium mb-1">Command History</h4>
-                  <p class="text-sm text-base-content/70">Every action (create, delete, move) is tracked in a command history with up to 50 operations.</p>
+                  <p class="text-sm text-base-content/70">
+                    Every action (create, delete, move) is tracked in a command history with up to 50 operations.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-warning/30">
                   <h4 class="font-medium mb-1">Undo/Redo Operations</h4>
                   <p class="text-sm text-base-content/70">
-                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Z</kbd> Undo last action • 
-                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Shift+Z</kbd> Redo undone action
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Z</kbd>
+                    Undo last action • <kbd class="kbd kbd-xs">Cmd/Ctrl+Shift+Z</kbd>
+                    Redo undone action
                   </p>
                 </div>
                 <div class="pl-4 border-l-2 border-warning/30">
                   <h4 class="font-medium mb-1">Smart Restoration</h4>
-                  <p class="text-sm text-base-content/70">Deleting a node and undoing restores both the node and its connected edges.</p>
+                  <p class="text-sm text-base-content/70">
+                    Deleting a node and undoing restores both the node and its connected edges.
+                  </p>
                 </div>
               </div>
             </div>
@@ -753,26 +1099,44 @@ defmodule ExFlowGraphWeb.HomeLive do
             <%!-- Selection & Keyboard Shortcuts --%>
             <div>
               <h3 class="text-lg font-semibold text-success mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 Selection & Shortcuts
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-success/30">
                   <h4 class="font-medium mb-1">Single Selection</h4>
-                  <p class="text-sm text-base-content/70">Click a node to select it. Selected nodes have a blue border and ring effect.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click a node to select it. Selected nodes have a blue border and ring effect.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-success/30">
                   <h4 class="font-medium mb-1">Multi-Select</h4>
-                  <p class="text-sm text-base-content/70">Hold <kbd class="kbd kbd-xs">Shift</kbd> or <kbd class="kbd kbd-xs">Cmd/Ctrl</kbd> and click to add/remove nodes from selection.</p>
+                  <p class="text-sm text-base-content/70">
+                    Hold <kbd class="kbd kbd-xs">Shift</kbd>
+                    or <kbd class="kbd kbd-xs">Cmd/Ctrl</kbd>
+                    and click to add/remove nodes from selection.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-success/30">
                   <h4 class="font-medium mb-1">Keyboard Shortcuts</h4>
                   <p class="text-sm text-base-content/70">
-                    <kbd class="kbd kbd-xs">Cmd/Ctrl+A</kbd> Select all • 
-                    <kbd class="kbd kbd-xs">Escape</kbd> Clear selection • 
-                    <kbd class="kbd kbd-xs">Delete</kbd> Delete selected
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+A</kbd>
+                    Select all • <kbd class="kbd kbd-xs">Escape</kbd>
+                    Clear selection • <kbd class="kbd kbd-xs">Delete</kbd>
+                    Delete selected
                   </p>
                 </div>
               </div>
@@ -781,23 +1145,43 @@ defmodule ExFlowGraphWeb.HomeLive do
             <%!-- Graph Persistence --%>
             <div>
               <h3 class="text-lg font-semibold text-info mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                  />
                 </svg>
                 Graph Persistence
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-info/30">
                   <h4 class="font-medium mb-1">Auto-Save</h4>
-                  <p class="text-sm text-base-content/70">Every change (node move, add, delete, edge creation) is automatically saved to memory.</p>
+                  <p class="text-sm text-base-content/70">
+                    Every change (node move, add, delete, edge creation) is automatically saved to memory.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-info/30">
                   <h4 class="font-medium mb-1">Save & Save As</h4>
-                  <p class="text-sm text-base-content/70"><span class="badge badge-primary badge-sm">Save</span> updates the current graph. <span class="badge badge-outline badge-sm">Save As</span> creates a new copy with a different name.</p>
+                  <p class="text-sm text-base-content/70">
+                    <span class="badge badge-primary badge-sm">Save</span>
+                    updates the current graph.
+                    <span class="badge badge-outline badge-sm">Save As</span>
+                    creates a new copy with a different name.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-info/30">
                   <h4 class="font-medium mb-1">Load Graphs</h4>
-                  <p class="text-sm text-base-content/70">Click "Load" to browse and load any previously saved graph. The current graph is replaced.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click "Load" to browse and load any previously saved graph. The current graph is replaced.
+                  </p>
                 </div>
               </div>
             </div>
@@ -840,13 +1224,26 @@ defmodule ExFlowGraphWeb.HomeLive do
           <%!-- Quick Tips --%>
           <div class="mt-6 rounded-lg bg-primary/5 p-4 border border-primary/20">
             <h4 class="font-semibold text-sm mb-2 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="1.5"
+                stroke="currentColor"
+                class="w-4 h-4"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"
+                />
               </svg>
               Pro Tips
             </h4>
             <ul class="text-sm text-base-content/70 space-y-1">
-              <li>• Hold <kbd class="kbd kbd-xs">Shift</kbd> while dragging for precise node placement</li>
+              <li>
+                • Hold <kbd class="kbd kbd-xs">Shift</kbd> while dragging for precise node placement
+              </li>
               <li>• Use the node list to quickly find and delete specific nodes</li>
               <li>• Create multiple named graphs to organize different workflows</li>
               <li>• The current graph name is shown in the header badge</li>
@@ -933,6 +1330,70 @@ defmodule ExFlowGraphWeb.HomeLive do
       <% end %>
     </div>
     """
+  end
+
+  # Helper function to broadcast graph differences after undo/redo
+  defp broadcast_graph_diff(old_graph, new_graph, user_id) do
+    old_nodes = FlowGraph.get_nodes(old_graph) |> Enum.map(& &1.id) |> MapSet.new()
+    new_nodes = FlowGraph.get_nodes(new_graph) |> Enum.map(& &1.id) |> MapSet.new()
+
+    old_edges = FlowGraph.get_edges(old_graph) |> Enum.map(& &1.id) |> MapSet.new()
+    new_edges = FlowGraph.get_edges(new_graph) |> Enum.map(& &1.id) |> MapSet.new()
+
+    # Broadcast added nodes
+    added_nodes = MapSet.difference(new_nodes, old_nodes)
+
+    Enum.each(added_nodes, fn node_id ->
+      case FlowGraph.get_node(new_graph, node_id) do
+        {:ok, node} ->
+          Collaboration.broadcast_node_created(@storage_id, user_id, node)
+
+        {:error, _} ->
+          :ok
+      end
+    end)
+
+    # Broadcast deleted nodes
+    deleted_nodes = MapSet.difference(old_nodes, new_nodes)
+
+    Enum.each(deleted_nodes, fn node_id ->
+      Collaboration.broadcast_node_deleted(@storage_id, user_id, node_id)
+    end)
+
+    # Broadcast moved nodes (nodes that exist in both but may have moved)
+    common_nodes = MapSet.intersection(old_nodes, new_nodes)
+
+    Enum.each(common_nodes, fn node_id ->
+      with {:ok, old_node} <- FlowGraph.get_node(old_graph, node_id),
+           {:ok, new_node} <- FlowGraph.get_node(new_graph, node_id) do
+        if old_node.position != new_node.position do
+          Collaboration.broadcast_node_moved(@storage_id, user_id, node_id, new_node.position)
+        end
+      end
+    end)
+
+    # Broadcast added edges
+    added_edges = MapSet.difference(new_edges, old_edges)
+
+    Enum.each(added_edges, fn edge_id ->
+      new_graph
+      |> FlowGraph.get_edges()
+      |> Enum.find(fn edge -> edge.id == edge_id end)
+      |> case do
+        nil ->
+          :ok
+
+        edge ->
+          Collaboration.broadcast_edge_created(@storage_id, user_id, edge)
+      end
+    end)
+
+    # Broadcast deleted edges
+    deleted_edges = MapSet.difference(old_edges, new_edges)
+
+    Enum.each(deleted_edges, fn edge_id ->
+      Collaboration.broadcast_edge_deleted(@storage_id, user_id, edge_id)
+    end)
   end
 
   defp create_demo_graph do

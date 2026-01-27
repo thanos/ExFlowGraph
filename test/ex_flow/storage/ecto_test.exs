@@ -1,9 +1,9 @@
 defmodule ExFlow.Storage.EctoTest do
   use ExFlowGraph.DataCase, async: true
 
-  alias ExFlow.Storage.Ecto, as: EctoStorage
   alias ExFlow.Core.Graph, as: FlowGraph
   alias ExFlow.GraphRecord
+  alias ExFlow.Storage.Ecto, as: EctoStorage
   alias ExFlowGraph.Repo
 
   describe "save/2 and load/1" do

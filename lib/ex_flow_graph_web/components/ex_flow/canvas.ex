@@ -1,4 +1,11 @@
 defmodule ExFlowGraphWeb.ExFlow.Canvas do
+  @moduledoc """
+  Canvas component for rendering the graph editor.
+
+  Provides the main interactive canvas with pan/zoom capabilities
+  and handles node and edge rendering.
+  """
+
   use ExFlowGraphWeb, :html
 
   attr :id, :string, required: true

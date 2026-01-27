@@ -292,23 +292,6 @@ export default {
     return { x, y }
   },
 
-  updateConnectedEdges(nodeId) {
-    const paths = this.el.querySelectorAll(
-      `path.exflow-edge[data-source-id='${nodeId}'], path.exflow-edge[data-target-id='${nodeId}']`
-    )
-
-    for (const pathEl of paths) {
-      const sourceId = pathEl.dataset.sourceId
-      const targetId = pathEl.dataset.targetId
-
-      const s = this.getNodeCenter(sourceId)
-      const t = this.getNodeCenter(targetId)
-      if (!s || !t) continue
-
-      pathEl.setAttribute("d", cubicBezierPath(s.x, s.y, t.x, t.y))
-    }
-  },
-
   getNodeCenter(id) {
     const nodeEl = this.el.querySelector(`.exflow-node[data-id='${id}']`)
     if (!nodeEl) return null

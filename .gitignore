@@ -35,3 +35,15 @@ ex_flow_graph-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Dialyzer PLT files
+/priv/plts/*.plt
+/priv/plts/*.plt.hash
+
+# Test coverage
+/cover/
+/coverage/
+coveralls.json
+
+# Credo
+/.credo/
+

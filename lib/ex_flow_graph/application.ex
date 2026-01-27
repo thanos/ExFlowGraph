@@ -12,6 +12,7 @@ defmodule ExFlowGraph.Application do
       ExFlowGraph.Repo,
       {DNSCluster, query: Application.get_env(:ex_flow_graph, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ExFlowGraph.PubSub},
+      ExFlowGraphWeb.Presence,
       ExFlow.Storage.InMemory,
       # Start a worker by calling: ExFlowGraph.Worker.start_link(arg)
       # {ExFlowGraph.Worker, arg},
