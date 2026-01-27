@@ -95,21 +95,27 @@ defmodule ExFlowGraphWeb.FlowLive do
   defp edges_for_ui(%LibGraph{} = graph, nodes) do
     node_by_id = Map.new(nodes, fn n -> {n.id, n} end)
 
-    for edge <- FlowGraph.get_edges(graph),
-        source = Map.get(node_by_id, edge.source),
-        target = Map.get(node_by_id, edge.target),
-        source != nil,
-        target != nil do
-      %{
-        id: edge.id,
-        source_id: edge.source,
-        target_id: edge.target,
-        source_x: source.x + 12,
-        source_y: source.y + 12,
-        target_x: target.x + 12,
-        target_y: target.y + 12
-      }
-    end
+    graph
+    |> FlowGraph.get_edges()
+    |> Enum.map(fn edge ->
+      source = Map.get(node_by_id, edge.source)
+      target = Map.get(node_by_id, edge.target)
+
+      if source && target do
+        %{
+          id: edge.id,
+          source_id: edge.source,
+          target_id: edge.target,
+          source_x: source.x + 12,
+          source_y: source.y + 12,
+          target_x: target.x + 12,
+          target_y: target.y + 12
+        }
+      else
+        nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp title_for(%{type: :agent, id: id}), do: "Agent · #{id}"
