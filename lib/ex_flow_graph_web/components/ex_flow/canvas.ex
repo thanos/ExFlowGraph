@@ -4,6 +4,7 @@ defmodule ExFlowGraphWeb.ExFlow.Canvas do
   attr :id, :string, required: true
   attr :nodes, :list, default: []
   attr :edges, :list, default: []
+  attr :selected_node_ids, :any, default: []
 
   def canvas(assigns) do
     ~H"""
@@ -11,6 +12,7 @@ defmodule ExFlowGraphWeb.ExFlow.Canvas do
       id={@id}
       phx-hook="ExFlowCanvas"
       class="relative h-[70vh] w-full overflow-hidden rounded-2xl border border-base-300 bg-gradient-to-br from-base-200/40 to-base-100 exflow-canvas-bg"
+      data-selected-ids={Jason.encode!(MapSet.to_list(@selected_node_ids))}
     >
       <div class="exflow-container absolute inset-0">
         <svg class="absolute inset-0 z-0 h-full w-full pointer-events-none">
@@ -29,7 +31,13 @@ defmodule ExFlowGraphWeb.ExFlow.Canvas do
 
         <div class="absolute inset-0 z-10 pointer-events-none">
           <%= for node <- @nodes do %>
-            <ExFlowGraphWeb.ExFlow.Node.node id={node.id} title={node.title} x={node.x} y={node.y} />
+            <ExFlowGraphWeb.ExFlow.Node.node
+              id={node.id}
+              title={node.title}
+              x={node.x}
+              y={node.y}
+              selected={MapSet.member?(@selected_node_ids, node.id)}
+            />
           <% end %>
         </div>
       </div>
