@@ -1,7 +1,7 @@
 defmodule ExFlow.Storage.Ecto do
   @moduledoc """
   Ecto-backed storage adapter for persisting graphs to a database.
-  
+
   This adapter serializes LibGraph structures to JSON and stores them
   in the database with optimistic locking support via version numbers.
   """

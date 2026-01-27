@@ -128,10 +128,11 @@ defmodule ExFlow.Storage.EctoTest do
   describe "data validation" do
     test "validates graph data structure" do
       # Create invalid record directly
-      changeset = GraphRecord.changeset(%GraphRecord{}, %{
-        name: "invalid",
-        data: %{"invalid" => "structure"}
-      })
+      changeset =
+        GraphRecord.changeset(%GraphRecord{}, %{
+          name: "invalid",
+          data: %{"invalid" => "structure"}
+        })
 
       refute changeset.valid?
       assert "must contain nodes" in errors_on(changeset).data

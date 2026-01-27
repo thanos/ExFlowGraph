@@ -1,7 +1,7 @@
 defmodule ExFlow.GraphRecord do
   @moduledoc """
   Ecto schema for persisting graphs to the database.
-  
+
   The graph data is stored as a JSON-serialized map in the `data` field.
   Optimistic locking is supported via the `version` field.
   """
