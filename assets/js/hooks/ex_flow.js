@@ -165,6 +165,8 @@ export default {
     const { scale, translateX, translateY } = this.transform
     this.container.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`
     this.container.style.transformOrigin = "0 0"
+    // Redraw edges to follow transformed nodes
+    this.redrawAllEdges()
   },
   
   screenToWorld(screenX, screenY) {
@@ -202,24 +204,29 @@ export default {
     const nodeEl = this.el.querySelector(`.exflow-node[data-id='${id}']`)
     if (!nodeEl) return null
 
-    // Try to read from current transform first (for live drag updates)
-    let x = parseFloat(nodeEl.dataset.x || "0")
-    let y = parseFloat(nodeEl.dataset.y || "0")
+    // Get node position in world coordinates
+    let worldX = parseFloat(nodeEl.dataset.x || "0")
+    let worldY = parseFloat(nodeEl.dataset.y || "0")
     
     // Check if there's a transform style applied (during drag)
     const transform = nodeEl.style.transform
     if (transform) {
       const match = transform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/)
       if (match) {
-        x = parseFloat(match[1])
-        y = parseFloat(match[2])
+        worldX = parseFloat(match[1])
+        worldY = parseFloat(match[2])
       }
     }
 
     const w = nodeEl.offsetWidth
     const h = nodeEl.offsetHeight
+    
+    // Convert world coordinates to screen coordinates
+    // (nodes are inside transformed container, edges are outside)
+    const screenX = worldX * this.transform.scale + this.transform.translateX + w / 2 * this.transform.scale
+    const screenY = worldY * this.transform.scale + this.transform.translateY + h / 2 * this.transform.scale
 
-    return { x: x + w / 2, y: y + h / 2 }
+    return { x: screenX, y: screenY }
   },
 }
 
