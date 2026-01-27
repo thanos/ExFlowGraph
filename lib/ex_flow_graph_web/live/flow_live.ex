@@ -44,6 +44,37 @@ defmodule ExFlowGraphWeb.FlowLive do
   end
 
   @impl true
+  def handle_event(
+        "create_edge",
+        %{
+          "source_id" => source_id,
+          "source_handle" => source_handle,
+          "target_id" => target_id,
+          "target_handle" => target_handle
+        },
+        socket
+      ) do
+    # Generate unique edge ID
+    edge_id = "edge-#{System.unique_integer([:positive])}"
+
+    case FlowGraph.add_edge(
+           socket.assigns.graph,
+           edge_id,
+           source_id,
+           source_handle,
+           target_id,
+           target_handle
+         ) do
+      {:ok, graph} ->
+        :ok = InMemory.save(@storage_id, graph)
+        {:noreply, assign(socket, :graph, graph)}
+
+      {:error, _reason} ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     nodes = nodes_for_ui(assigns.graph)
     edges = edges_for_ui(assigns.graph, nodes)
@@ -57,7 +88,7 @@ defmodule ExFlowGraphWeb.FlowLive do
           <div>
             <h1 class="text-2xl font-semibold tracking-tight">ExFlow</h1>
             <p class="mt-1 text-sm text-base-content/70">
-              Hybrid canvas: HTML nodes + SVG edges. Drag nodes to move • Drag background to pan • Scroll to zoom
+              Drag nodes to reposition • Drag background to pan • Scroll to zoom • Drag from source handle (blue) to target handle (gray) to create edges
             </p>
           </div>
         </div>

@@ -18,12 +18,14 @@ defmodule ExFlowGraphWeb.ExFlow.Node do
       <div class="font-medium">{@title}</div>
       <div class="mt-2 flex gap-2">
         <span
-          class="exflow-handle exflow-handle-source inline-flex size-2 rounded-full bg-primary"
+          class="exflow-handle exflow-handle-source inline-flex size-2 rounded-full bg-primary cursor-crosshair hover:scale-150 transition-transform"
           data-handle="out"
+          data-node-id={@id}
         />
         <span
-          class="exflow-handle exflow-handle-target inline-flex size-2 rounded-full bg-base-content/40"
+          class="exflow-handle exflow-handle-target inline-flex size-2 rounded-full bg-base-content/40 cursor-crosshair hover:scale-150 transition-transform"
           data-handle="in"
+          data-node-id={@id}
         />
       </div>
     </div>
