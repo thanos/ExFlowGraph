@@ -29,6 +29,7 @@ defmodule ExFlowGraphWeb.HomeLive do
       |> assign(:show_load_modal, false)
       |> assign(:show_help, false)
       |> assign(:selected_node_ids, MapSet.new())
+      |> assign(:history, ExFlow.HistoryManager.new())
 
     {:ok, socket}
   end
@@ -58,17 +59,19 @@ defmodule ExFlowGraphWeb.HomeLive do
       ) do
     edge_id = "edge-#{System.unique_integer([:positive])}"
 
-    case FlowGraph.add_edge(
-           socket.assigns.graph,
-           edge_id,
-           source_id,
-           source_handle,
-           target_id,
-           target_handle
-         ) do
-      {:ok, graph} ->
+    command =
+      ExFlow.Commands.CreateEdgeCommand.new(
+        edge_id,
+        source_id,
+        source_handle,
+        target_id,
+        target_handle
+      )
+
+    case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
+      {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
-        {:noreply, assign(socket, :graph, graph)}
+        {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
         {:noreply, socket}
@@ -84,12 +87,13 @@ defmodule ExFlowGraphWeb.HomeLive do
     x = :rand.uniform(400) + 50
     y = :rand.uniform(300) + 50
 
-    case FlowGraph.add_node(socket.assigns.graph, node_id, node_type, %{
-           position: %{x: x, y: y}
-         }) do
-      {:ok, graph} ->
+    command =
+      ExFlow.Commands.CreateNodeCommand.new(node_id, node_type, %{position: %{x: x, y: y}})
+
+    case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
+      {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
-        {:noreply, assign(socket, :graph, graph)}
+        {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
         {:noreply, socket}
@@ -98,10 +102,12 @@ defmodule ExFlowGraphWeb.HomeLive do
 
   @impl true
   def handle_event("delete_node", %{"id" => id}, socket) do
-    case FlowGraph.delete_node(socket.assigns.graph, id) do
-      {:ok, graph} ->
+    command = ExFlow.Commands.DeleteNodeCommand.new(id, socket.assigns.graph)
+
+    case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
+      {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
-        {:noreply, assign(socket, :graph, graph)}
+        {:noreply, assign(socket, graph: graph, history: history)}
 
       {:error, _reason} ->
         {:noreply, socket}
@@ -283,6 +289,48 @@ defmodule ExFlowGraphWeb.HomeLive do
   end
 
   @impl true
+  def handle_event("undo", _params, socket) do
+    case ExFlow.HistoryManager.undo(socket.assigns.history, socket.assigns.graph) do
+      {:ok, history, graph} ->
+        :ok = InMemory.save(@storage_id, graph)
+
+        socket =
+          socket
+          |> assign(graph: graph, history: history)
+          |> put_flash(:info, "Undone: #{ExFlow.HistoryManager.next_redo_description(history)}")
+
+        {:noreply, socket}
+
+      {:error, :nothing_to_undo} ->
+        {:noreply, put_flash(socket, :info, "Nothing to undo")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to undo")}
+    end
+  end
+
+  @impl true
+  def handle_event("redo", _params, socket) do
+    case ExFlow.HistoryManager.redo(socket.assigns.history, socket.assigns.graph) do
+      {:ok, history, graph} ->
+        :ok = InMemory.save(@storage_id, graph)
+
+        socket =
+          socket
+          |> assign(graph: graph, history: history)
+          |> put_flash(:info, "Redone: #{ExFlow.HistoryManager.next_undo_description(history)}")
+
+        {:noreply, socket}
+
+      {:error, :nothing_to_redo} ->
+        {:noreply, put_flash(socket, :info, "Nothing to redo")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to redo")}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     nodes = nodes_for_ui(assigns.graph)
     edges = edges_for_ui(assigns.graph, nodes)
@@ -358,6 +406,56 @@ defmodule ExFlowGraphWeb.HomeLive do
                   />
                 </svg>
                 Agent
+              </button>
+            </div>
+
+            <div class="divider divider-horizontal"></div>
+
+            <%!-- Undo/Redo --%>
+            <div class="flex items-center gap-2">
+              <button
+                phx-click="undo"
+                class="btn btn-sm btn-ghost gap-2"
+                disabled={!ExFlow.HistoryManager.can_undo?(@history)}
+                title={ExFlow.HistoryManager.next_undo_description(@history) || "Nothing to undo"}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-4 h-4"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+                  />
+                </svg>
+                Undo
+              </button>
+              <button
+                phx-click="redo"
+                class="btn btn-sm btn-ghost gap-2"
+                disabled={!ExFlow.HistoryManager.can_redo?(@history)}
+                title={ExFlow.HistoryManager.next_redo_description(@history) || "Nothing to redo"}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-4 h-4"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3"
+                  />
+                </svg>
+                Redo
               </button>
             </div>
 
@@ -621,6 +719,33 @@ defmodule ExFlowGraphWeb.HomeLive do
                 <div class="pl-4 border-l-2 border-accent/30">
                   <h4 class="font-medium mb-1">Cancel Creation</h4>
                   <p class="text-sm text-base-content/70">Press <kbd class="kbd kbd-xs">Escape</kbd> or release outside a valid target to cancel edge creation.</p>
+                </div>
+              </div>
+            </div>
+
+            <%!-- Undo/Redo --%>
+            <div>
+              <h3 class="text-lg font-semibold text-warning mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                </svg>
+                Undo/Redo
+              </h3>
+              <div class="space-y-3">
+                <div class="pl-4 border-l-2 border-warning/30">
+                  <h4 class="font-medium mb-1">Command History</h4>
+                  <p class="text-sm text-base-content/70">Every action (create, delete, move) is tracked in a command history with up to 50 operations.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-warning/30">
+                  <h4 class="font-medium mb-1">Undo/Redo Operations</h4>
+                  <p class="text-sm text-base-content/70">
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Z</kbd> Undo last action • 
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Shift+Z</kbd> Redo undone action
+                  </p>
+                </div>
+                <div class="pl-4 border-l-2 border-warning/30">
+                  <h4 class="font-medium mb-1">Smart Restoration</h4>
+                  <p class="text-sm text-base-content/70">Deleting a node and undoing restores both the node and its connected edges.</p>
                 </div>
               </div>
             </div>
