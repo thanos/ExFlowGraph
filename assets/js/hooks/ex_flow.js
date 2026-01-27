@@ -7,8 +7,19 @@ export default {
     // Transform state: scale, translateX, translateY
     this.transform = { scale: 1.0, translateX: 0, translateY: 0 }
     
+    // Performance optimizations
+    this.adjacencyMap = new Map() // node_id -> [edge_ids]
+    this.nodeCache = new Map() // node_id -> {x, y, width, height}
+    this.pendingEdgeUpdates = new Set() // edge_ids to update
+    this.rafId = null
+    this.perfMonitor = { dragStart: 0, frameCount: 0, slowFrames: 0 }
+    
     // Get the container element that will be transformed
     this.container = this.el.querySelector(".exflow-container") || this.el
+    
+    // Build adjacency map and cache on mount
+    this.buildAdjacencyMap()
+    this.cacheNodeGeometry()
 
     this.onMouseDown = (e) => {
       // Check if clicking on a handle for edge creation
@@ -34,6 +45,12 @@ export default {
 
         this.drag = { id, nodeEl, startX, startY, originX, originY }
         nodeEl.classList.add("ring-2", "ring-primary/60")
+        nodeEl.style.willChange = "transform" // Optimize rendering
+        
+        // Start performance monitoring
+        this.perfMonitor.dragStart = performance.now()
+        this.perfMonitor.frameCount = 0
+        this.perfMonitor.slowFrames = 0
 
         window.addEventListener("mousemove", this.onMouseMove)
         window.addEventListener("mouseup", this.onMouseUp, { once: true })
@@ -60,6 +77,8 @@ export default {
 
     this.onMouseMove = (e) => {
       if (!this.drag) return
+      
+      const frameStart = performance.now()
 
       const dx = (e.clientX - this.drag.startX) / this.transform.scale
       const dy = (e.clientY - this.drag.startY) / this.transform.scale
@@ -67,11 +86,27 @@ export default {
       const x = this.drag.originX + dx
       const y = this.drag.originY + dy
 
+      // Update node position immediately (no reflow)
       this.drag.nodeEl.style.transform = `translate(${x}px, ${y}px)`
       this.drag.nodeEl.dataset.x = `${x}`
       this.drag.nodeEl.dataset.y = `${y}`
+      
+      // Update cache
+      this.nodeCache.set(this.drag.id, { x, y })
 
-      this.updateConnectedEdges(this.drag.id)
+      // Mark connected edges for update (batched in RAF)
+      const connectedEdges = this.adjacencyMap.get(this.drag.id) || []
+      connectedEdges.forEach(edgeId => this.pendingEdgeUpdates.add(edgeId))
+      
+      // Schedule batched edge update
+      this.scheduleEdgeUpdate()
+      
+      // Performance monitoring
+      const frameTime = performance.now() - frameStart
+      this.perfMonitor.frameCount++
+      if (frameTime > 16) { // Slower than 60fps
+        this.perfMonitor.slowFrames++
+      }
     }
     
     this.onPanMove = (e) => {
@@ -101,6 +136,18 @@ export default {
       const y = parseFloat(nodeEl.dataset.y || "0")
 
       nodeEl.classList.remove("ring-2", "ring-primary/60")
+      nodeEl.style.willChange = "auto" // Clean up rendering hint
+      
+      // Log performance stats
+      const dragDuration = performance.now() - this.perfMonitor.dragStart
+      if (this.perfMonitor.frameCount > 0) {
+        const avgFrameTime = dragDuration / this.perfMonitor.frameCount
+        const slowFramePercent = (this.perfMonitor.slowFrames / this.perfMonitor.frameCount) * 100
+        
+        if (slowFramePercent > 10) {
+          console.warn(`Performance: ${slowFramePercent.toFixed(1)}% slow frames (avg ${avgFrameTime.toFixed(2)}ms)`)
+        }
+      }
 
       window.removeEventListener("mousemove", this.onMouseMove)
       this.drag = null
@@ -148,6 +195,10 @@ export default {
   },
 
   updated() {
+    // Rebuild performance caches after LiveView updates
+    this.buildAdjacencyMap()
+    this.cacheNodeGeometry()
+    
     // Redraw all edges after LiveView updates the DOM
     this.redrawAllEdges()
   },
@@ -367,6 +418,101 @@ export default {
     document.querySelectorAll(".exflow-handle-target").forEach(handle => {
       handle.classList.remove("ring-2", "ring-primary/30", "ring-success")
     })
+  },
+  
+  // Performance optimization methods
+  
+  buildAdjacencyMap() {
+    // Build a map of node_id -> [edge_ids] for fast edge lookup
+    this.adjacencyMap.clear()
+    
+    const edges = this.el.querySelectorAll("[data-edge-id]")
+    edges.forEach(edge => {
+      const edgeId = edge.dataset.edgeId
+      const sourceId = edge.dataset.sourceId
+      const targetId = edge.dataset.targetId
+      
+      if (!this.adjacencyMap.has(sourceId)) {
+        this.adjacencyMap.set(sourceId, [])
+      }
+      if (!this.adjacencyMap.has(targetId)) {
+        this.adjacencyMap.set(targetId, [])
+      }
+      
+      this.adjacencyMap.get(sourceId).push(edgeId)
+      this.adjacencyMap.get(targetId).push(edgeId)
+    })
+  },
+  
+  cacheNodeGeometry() {
+    // Cache node positions to avoid layout thrashing
+    this.nodeCache.clear()
+    
+    const nodes = this.el.querySelectorAll(".exflow-node")
+    nodes.forEach(node => {
+      const id = node.dataset.id
+      const x = parseFloat(node.dataset.x || "0")
+      const y = parseFloat(node.dataset.y || "0")
+      
+      this.nodeCache.set(id, { x, y })
+    })
+  },
+  
+  scheduleEdgeUpdate() {
+    // Batch edge updates in a single requestAnimationFrame
+    if (this.rafId) return // Already scheduled
+    
+    this.rafId = requestAnimationFrame(() => {
+      this.flushEdgeUpdates()
+      this.rafId = null
+    })
+  },
+  
+  flushEdgeUpdates() {
+    // Update all pending edges in a single batch
+    if (this.pendingEdgeUpdates.size === 0) return
+    
+    this.pendingEdgeUpdates.forEach(edgeId => {
+      const edge = this.el.querySelector(`[data-edge-id="${edgeId}"]`)
+      if (!edge) return
+      
+      const sourceId = edge.dataset.sourceId
+      const targetId = edge.dataset.targetId
+      
+      const sourcePos = this.getNodeCenterCached(sourceId)
+      const targetPos = this.getNodeCenterCached(targetId)
+      
+      if (sourcePos && targetPos) {
+        const d = cubicBezierPath(sourcePos.x, sourcePos.y, targetPos.x, targetPos.y)
+        edge.setAttribute("d", d)
+      }
+    })
+    
+    this.pendingEdgeUpdates.clear()
+  },
+  
+  getNodeCenterCached(nodeId) {
+    // Use cached position if available, otherwise compute
+    const cached = this.nodeCache.get(nodeId)
+    if (cached) {
+      return { x: cached.x + 12, y: cached.y + 12 } // Offset to center
+    }
+    
+    const node = this.el.querySelector(`[data-id="${nodeId}"]`)
+    if (!node) return null
+    
+    const x = parseFloat(node.dataset.x || "0")
+    const y = parseFloat(node.dataset.y || "0")
+    
+    return { x: x + 12, y: y + 12 }
+  },
+  
+  updateConnectedEdges(nodeId) {
+    // Legacy method - now uses batched updates via scheduleEdgeUpdate
+    // This is called from updated() lifecycle
+    const connectedEdges = this.adjacencyMap.get(nodeId) || []
+    connectedEdges.forEach(edgeId => this.pendingEdgeUpdates.add(edgeId))
+    this.scheduleEdgeUpdate()
   },
 }
 
