@@ -194,6 +194,20 @@ export default {
     }
 
     this.onKeyDown = (e) => {
+      // Cmd/Ctrl+Z: undo
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault()
+        this.pushEvent("undo", {})
+        return
+      }
+      
+      // Cmd/Ctrl+Shift+Z: redo
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault()
+        this.pushEvent("redo", {})
+        return
+      }
+      
       // Escape: clear selection
       if (e.key === "Escape") {
         this.pushEvent("deselect_all", {})
