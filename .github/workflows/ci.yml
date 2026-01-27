@@ -137,20 +137,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: assets/package-lock.json
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
 
-      - name: Install Node dependencies
-        working-directory: assets
-        run: npm ci
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Setup assets
+        run: mix assets.setup
 
       - name: Build assets
-        working-directory: assets
-        run: npm run build
+        run: mix assets.build
 
       - name: Check for asset build errors
         run: |
