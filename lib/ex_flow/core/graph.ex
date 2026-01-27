@@ -75,12 +75,29 @@ defmodule ExFlow.Core.Graph do
 
   @spec update_node_position(t(), String.t(), %{x: number(), y: number()}) ::
           {:ok, t()} | {:error, term()}
-  def update_node_position(%LibGraph{} = graph, id, %{x: x, y: y}) do
+  def update_node_position(%LibGraph{} = graph, id, %{x: x, y: y})
+      when is_binary(id) and is_number(x) and is_number(y) do
     case LibGraph.vertex_labels(graph, id) do
       [node] when is_map(node) ->
+        # Store all edges connected to this node before deleting
+        in_edges = LibGraph.in_edges(graph, id)
+        out_edges = LibGraph.out_edges(graph, id)
+
+        # Update the node
         updated_node = put_in(node, [:position], %{x: x, y: y})
         graph = LibGraph.delete_vertex(graph, id)
-        {:ok, LibGraph.add_vertex(graph, id, [updated_node])}
+        graph = LibGraph.add_vertex(graph, id, [updated_node])
+
+        # Restore all edges
+        graph = Enum.reduce(in_edges, graph, fn edge, g ->
+          LibGraph.add_edge(g, edge.v1, id, label: edge.label)
+        end)
+
+        graph = Enum.reduce(out_edges, graph, fn edge, g ->
+          LibGraph.add_edge(g, id, edge.v2, label: edge.label)
+        end)
+
+        {:ok, graph}
 
       _ ->
         {:error, :node_not_found}
