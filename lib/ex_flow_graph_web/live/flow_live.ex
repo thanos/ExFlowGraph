@@ -15,10 +15,10 @@ defmodule ExFlowGraphWeb.FlowLive do
           graph
 
         _ ->
-          FlowGraph.new()
-          |> FlowGraph.add_node("agent-1", :agent, %{position: %{x: 120, y: 120}})
-          |> FlowGraph.add_node("task-1", :task, %{position: %{x: 520, y: 260}})
-          |> FlowGraph.add_edge("edge-1", "agent-1", "out", "task-1", "in")
+          {:ok, g1} = FlowGraph.add_node(FlowGraph.new(), "agent-1", :agent, %{position: %{x: 120, y: 120}})
+          {:ok, g2} = FlowGraph.add_node(g1, "task-1", :task, %{position: %{x: 520, y: 260}})
+          {:ok, g3} = FlowGraph.add_edge(g2, "edge-1", "agent-1", "out", "task-1", "in")
+          g3
       end
 
     InMemory.save(@storage_id, graph)
@@ -31,13 +31,14 @@ defmodule ExFlowGraphWeb.FlowLive do
 
   @impl true
   def handle_event("update_position", %{"id" => id, "x" => x, "y" => y}, socket) do
-    graph =
-      socket.assigns.graph
-      |> FlowGraph.update_node_position(id, %{x: round(x), y: round(y)})
-
-    :ok = InMemory.save(@storage_id, graph)
-
-    {:noreply, assign(socket, :graph, graph)}
+    case FlowGraph.update_node_position(socket.assigns.graph, id, %{x: round(x), y: round(y)}) do
+      {:ok, graph} ->
+        :ok = InMemory.save(@storage_id, graph)
+        {:noreply, assign(socket, :graph, graph)}
+      
+      {:error, _reason} ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
