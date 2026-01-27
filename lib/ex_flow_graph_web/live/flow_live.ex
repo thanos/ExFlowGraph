@@ -15,7 +15,9 @@ defmodule ExFlowGraphWeb.FlowLive do
           graph
 
         _ ->
-          {:ok, g1} = FlowGraph.add_node(FlowGraph.new(), "agent-1", :agent, %{position: %{x: 120, y: 120}})
+          {:ok, g1} =
+            FlowGraph.add_node(FlowGraph.new(), "agent-1", :agent, %{position: %{x: 120, y: 120}})
+
           {:ok, g2} = FlowGraph.add_node(g1, "task-1", :task, %{position: %{x: 520, y: 260}})
           {:ok, g3} = FlowGraph.add_edge(g2, "edge-1", "agent-1", "out", "task-1", "in")
           g3
@@ -35,7 +37,7 @@ defmodule ExFlowGraphWeb.FlowLive do
       {:ok, graph} ->
         :ok = InMemory.save(@storage_id, graph)
         {:noreply, assign(socket, :graph, graph)}
-      
+
       {:error, _reason} ->
         {:noreply, socket}
     end
@@ -55,7 +57,7 @@ defmodule ExFlowGraphWeb.FlowLive do
           <div>
             <h1 class="text-2xl font-semibold tracking-tight">ExFlow</h1>
             <p class="mt-1 text-sm text-base-content/70">
-              Hybrid canvas: HTML nodes + SVG edges. Drag is client-side; persistence happens on mouseup.
+              Hybrid canvas: HTML nodes + SVG edges. Drag nodes to move • Drag background to pan • Scroll to zoom
             </p>
           </div>
         </div>
@@ -93,20 +95,27 @@ defmodule ExFlowGraphWeb.FlowLive do
   defp edges_for_ui(%LibGraph{} = graph, nodes) do
     node_by_id = Map.new(nodes, fn n -> {n.id, n} end)
 
-    for edge <- LibGraph.edges(graph) do
-      source = Map.get(node_by_id, edge.v1)
-      target = Map.get(node_by_id, edge.v2)
+    graph
+    |> FlowGraph.get_edges()
+    |> Enum.map(fn edge ->
+      source = Map.get(node_by_id, edge.source)
+      target = Map.get(node_by_id, edge.target)
 
-      %{
-        id: edge.label || "#{edge.v1}-#{edge.v2}",
-        source_id: edge.v1,
-        target_id: edge.v2,
-        source_x: source.x + 12,
-        source_y: source.y + 12,
-        target_x: target.x + 12,
-        target_y: target.y + 12
-      }
-    end
+      if source && target do
+        %{
+          id: edge.id,
+          source_id: edge.source,
+          target_id: edge.target,
+          source_x: source.x + 12,
+          source_y: source.y + 12,
+          target_x: target.x + 12,
+          target_y: target.y + 12
+        }
+      else
+        nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp title_for(%{type: :agent, id: id}), do: "Agent · #{id}"
