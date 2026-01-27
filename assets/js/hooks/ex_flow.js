@@ -2,6 +2,7 @@ export default {
   mounted() {
     this.drag = null
     this.pan = null
+    this.edgeCreation = null
     
     // Transform state: scale, translateX, translateY
     this.transform = { scale: 1.0, translateX: 0, translateY: 0 }
@@ -10,6 +11,15 @@ export default {
     this.container = this.el.querySelector(".exflow-container") || this.el
 
     this.onMouseDown = (e) => {
+      // Check if clicking on a handle for edge creation
+      const handleEl = e.target.closest(".exflow-handle")
+      if (handleEl && handleEl.classList.contains("exflow-handle-source")) {
+        e.preventDefault()
+        e.stopPropagation()
+        this.startEdgeCreation(e, handleEl)
+        return
+      }
+      
       const nodeEl = e.target.closest(".exflow-node")
       
       // If clicking on a node, start node drag
@@ -222,6 +232,127 @@ export default {
     const h = nodeEl.offsetHeight
 
     return { x: x + w / 2, y: y + h / 2 }
+  },
+  
+  startEdgeCreation(e, handleEl) {
+    const nodeId = handleEl.dataset.nodeId
+    const handleType = handleEl.dataset.handle
+    
+    // Get handle position in screen coordinates
+    const rect = handleEl.getBoundingClientRect()
+    const canvasRect = this.el.getBoundingClientRect()
+    const startX = rect.left + rect.width / 2 - canvasRect.left
+    const startY = rect.top + rect.height / 2 - canvasRect.top
+    
+    this.edgeCreation = {
+      sourceNodeId: nodeId,
+      sourceHandle: handleType,
+      startX,
+      startY,
+      currentX: startX,
+      currentY: startY
+    }
+    
+    // Create ghost edge SVG path
+    this.createGhostEdge()
+    
+    // Highlight compatible target handles
+    this.highlightTargetHandles()
+    
+    this.onEdgeCreationMove = this.onEdgeCreationMove.bind(this)
+    this.onEdgeCreationEnd = this.onEdgeCreationEnd.bind(this)
+    
+    window.addEventListener("mousemove", this.onEdgeCreationMove)
+    window.addEventListener("mouseup", this.onEdgeCreationEnd, { once: true })
+  },
+  
+  onEdgeCreationMove(e) {
+    if (!this.edgeCreation) return
+    
+    const canvasRect = this.el.getBoundingClientRect()
+    this.edgeCreation.currentX = e.clientX - canvasRect.left
+    this.edgeCreation.currentY = e.clientY - canvasRect.top
+    
+    this.updateGhostEdge()
+    
+    // Check if hovering over a compatible target handle
+    const targetHandle = document.elementFromPoint(e.clientX, e.clientY)?.closest(".exflow-handle-target")
+    
+    // Remove previous hover state
+    document.querySelectorAll(".exflow-handle-target.ring-2").forEach(el => {
+      el.classList.remove("ring-2", "ring-success")
+    })
+    
+    if (targetHandle && targetHandle.dataset.nodeId !== this.edgeCreation.sourceNodeId) {
+      targetHandle.classList.add("ring-2", "ring-success")
+    }
+  },
+  
+  onEdgeCreationEnd(e) {
+    if (!this.edgeCreation) return
+    
+    // Check if dropped on a valid target handle
+    const targetHandle = document.elementFromPoint(e.clientX, e.clientY)?.closest(".exflow-handle-target")
+    
+    if (targetHandle && targetHandle.dataset.nodeId !== this.edgeCreation.sourceNodeId) {
+      // Valid drop - create edge
+      const targetNodeId = targetHandle.dataset.nodeId
+      const targetHandleType = targetHandle.dataset.handle
+      
+      this.pushEvent("create_edge", {
+        source_id: this.edgeCreation.sourceNodeId,
+        source_handle: this.edgeCreation.sourceHandle,
+        target_id: targetNodeId,
+        target_handle: targetHandleType
+      })
+    }
+    
+    // Cleanup
+    this.removeGhostEdge()
+    this.removeTargetHighlights()
+    window.removeEventListener("mousemove", this.onEdgeCreationMove)
+    this.edgeCreation = null
+  },
+  
+  createGhostEdge() {
+    const svg = this.el.querySelector("svg")
+    if (!svg) return
+    
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
+    path.setAttribute("id", "ghost-edge")
+    path.setAttribute("class", "stroke-primary/50 stroke-2 fill-none pointer-events-none")
+    path.setAttribute("stroke-dasharray", "5,5")
+    svg.appendChild(path)
+    
+    this.updateGhostEdge()
+  },
+  
+  updateGhostEdge() {
+    const path = this.el.querySelector("#ghost-edge")
+    if (!path || !this.edgeCreation) return
+    
+    const { startX, startY, currentX, currentY } = this.edgeCreation
+    const d = cubicBezierPath(startX, startY, currentX, currentY)
+    path.setAttribute("d", d)
+  },
+  
+  removeGhostEdge() {
+    const path = this.el.querySelector("#ghost-edge")
+    if (path) path.remove()
+  },
+  
+  highlightTargetHandles() {
+    document.querySelectorAll(".exflow-handle-target").forEach(handle => {
+      if (handle.dataset.nodeId !== this.edgeCreation.sourceNodeId) {
+        handle.classList.add("ring-2", "ring-primary/30")
+      }
+    })
+  },
+  
+  removeTargetHighlights() {
+    document.querySelectorAll(".exflow-handle-target").forEach(handle => {
+      handle.classList.remove("ring-2", "ring-primary/30", "ring-success")
+    })
   },
 }
 

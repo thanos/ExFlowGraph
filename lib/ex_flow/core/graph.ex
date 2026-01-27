@@ -89,13 +89,15 @@ defmodule ExFlow.Core.Graph do
         graph = LibGraph.add_vertex(graph, id, [updated_node])
 
         # Restore all edges
-        graph = Enum.reduce(in_edges, graph, fn edge, g ->
-          LibGraph.add_edge(g, edge.v1, id, label: edge.label)
-        end)
+        graph =
+          Enum.reduce(in_edges, graph, fn edge, g ->
+            LibGraph.add_edge(g, edge.v1, id, label: edge.label)
+          end)
 
-        graph = Enum.reduce(out_edges, graph, fn edge, g ->
-          LibGraph.add_edge(g, id, edge.v2, label: edge.label)
-        end)
+        graph =
+          Enum.reduce(out_edges, graph, fn edge, g ->
+            LibGraph.add_edge(g, id, edge.v2, label: edge.label)
+          end)
 
         {:ok, graph}
 
