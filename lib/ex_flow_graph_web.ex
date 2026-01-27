@@ -26,6 +26,7 @@ defmodule ExFlowGraphWeb do
       # Import common connection and controller functions to use in pipelines
       import Plug.Conn
       import Phoenix.Controller
+      import Phoenix.LiveView.JS
       import Phoenix.LiveView.Router
     end
   end
@@ -88,8 +89,8 @@ defmodule ExFlowGraphWeb do
       import ExFlowGraphWeb.CoreComponents
 
       # Common modules used in templates
-      alias Phoenix.LiveView.JS
       alias ExFlowGraphWeb.Layouts
+      alias Phoenix.LiveView.JS
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())

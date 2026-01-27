@@ -1,4 +1,11 @@
 defmodule ExFlowGraphWeb.ExFlow.Edge do
+  @moduledoc """
+  Edge component for rendering connections between nodes.
+
+  Displays SVG paths connecting node handles with visual styling
+  and interactive capabilities.
+  """
+
   use ExFlowGraphWeb, :html
 
   attr :id, :string, required: true

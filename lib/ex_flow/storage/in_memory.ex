@@ -1,4 +1,11 @@
 defmodule ExFlow.Storage.InMemory do
+  @moduledoc """
+  In-memory storage adapter for graphs using Agent.
+
+  Stores graphs in memory for fast access during development and testing.
+  Data is lost when the application restarts.
+  """
+
   @behaviour ExFlow.Storage
 
   use Agent

@@ -10,8 +10,8 @@ defmodule ExFlowGraphWeb.Live.Collaboration do
   - Node locking
   """
 
-  alias Phoenix.PubSub
   alias ExFlowGraphWeb.Presence
+  alias Phoenix.PubSub
 
   @pubsub ExFlowGraph.PubSub
 

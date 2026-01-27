@@ -1,4 +1,11 @@
 defmodule ExFlowGraphWeb.ExFlow.Node do
+  @moduledoc """
+  Node component for rendering individual graph nodes.
+
+  Displays nodes with drag-and-drop functionality, connection handles,
+  and visual feedback for selection state.
+  """
+
   use ExFlowGraphWeb, :html
 
   attr :id, :string, required: true
