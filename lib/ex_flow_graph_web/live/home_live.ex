@@ -347,6 +347,13 @@ defmodule ExFlowGraphWeb.HomeLive do
       {:ok, history, graph} ->
         :ok = InMemory.save(@storage_id, graph)
 
+        # Broadcast deletions to other users
+        if socket.assigns.user_id do
+          Enum.each(selected_ids, fn id ->
+            Collaboration.broadcast_node_deleted(@storage_id, socket.assigns.user_id, id)
+          end)
+        end
+
         socket =
           socket
           |> assign(:graph, graph)
