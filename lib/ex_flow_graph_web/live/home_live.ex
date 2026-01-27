@@ -28,6 +28,7 @@ defmodule ExFlowGraphWeb.HomeLive do
       |> assign(:show_save_as_modal, false)
       |> assign(:show_load_modal, false)
       |> assign(:show_help, false)
+      |> assign(:selected_node_ids, MapSet.new())
 
     {:ok, socket}
   end
@@ -212,9 +213,73 @@ defmodule ExFlowGraphWeb.HomeLive do
     socket =
       socket
       |> assign(:graph, graph)
+      |> assign(:selected_node_ids, MapSet.new())
       |> put_flash(:info, "Loaded #{size} test graph")
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("select_node", %{"id" => id, "multi" => multi}, socket) do
+    selected =
+      if multi == "true" do
+        # Multi-select: toggle the node
+        if MapSet.member?(socket.assigns.selected_node_ids, id) do
+          MapSet.delete(socket.assigns.selected_node_ids, id)
+        else
+          MapSet.put(socket.assigns.selected_node_ids, id)
+        end
+      else
+        # Single select: replace selection
+        MapSet.new([id])
+      end
+
+    {:noreply, assign(socket, :selected_node_ids, selected)}
+  end
+
+  @impl true
+  def handle_event("deselect_all", _params, socket) do
+    {:noreply, assign(socket, :selected_node_ids, MapSet.new())}
+  end
+
+  @impl true
+  def handle_event("select_all", _params, socket) do
+    all_node_ids =
+      socket.assigns.graph
+      |> FlowGraph.get_nodes()
+      |> Enum.map(& &1.id)
+      |> MapSet.new()
+
+    {:noreply, assign(socket, :selected_node_ids, all_node_ids)}
+  end
+
+  @impl true
+  def handle_event("delete_selected", _params, socket) do
+    selected_ids = MapSet.to_list(socket.assigns.selected_node_ids)
+
+    graph =
+      Enum.reduce(selected_ids, socket.assigns.graph, fn id, acc_graph ->
+        case FlowGraph.delete_node(acc_graph, id) do
+          {:ok, new_graph} -> new_graph
+          {:error, _} -> acc_graph
+        end
+      end)
+
+    :ok = InMemory.save(@storage_id, graph)
+
+    socket =
+      socket
+      |> assign(:graph, graph)
+      |> assign(:selected_node_ids, MapSet.new())
+      |> put_flash(:info, "Deleted #{length(selected_ids)} node(s)")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("marquee_select", %{"node_ids" => node_ids}, socket) do
+    selected = MapSet.new(node_ids)
+    {:noreply, assign(socket, :selected_node_ids, selected)}
   end
 
   @impl true
@@ -429,13 +494,24 @@ defmodule ExFlowGraphWeb.HomeLive do
                 <span class="font-medium text-base-content/70">Edges:</span>
                 <span class="badge badge-secondary">{length(@edges)}</span>
               </div>
+              <%= if MapSet.size(@selected_node_ids) > 0 do %>
+                <div class="flex items-center gap-1">
+                  <span class="font-medium text-base-content/70">Selected:</span>
+                  <span class="badge badge-accent">{MapSet.size(@selected_node_ids)}</span>
+                </div>
+              <% end %>
             </div>
           </div>
         </div>
 
         <%!-- Canvas --%>
         <div class="rounded-2xl border border-base-300 bg-base-100 shadow-lg overflow-hidden">
-          <ExFlowGraphWeb.ExFlow.Canvas.canvas id="exflow-canvas" nodes={@nodes} edges={@edges} />
+          <ExFlowGraphWeb.ExFlow.Canvas.canvas
+            id="exflow-canvas"
+            nodes={@nodes}
+            edges={@edges}
+            selected_node_ids={@selected_node_ids}
+          />
         </div>
 
         <%!-- Node List --%>
@@ -545,6 +621,34 @@ defmodule ExFlowGraphWeb.HomeLive do
                 <div class="pl-4 border-l-2 border-accent/30">
                   <h4 class="font-medium mb-1">Cancel Creation</h4>
                   <p class="text-sm text-base-content/70">Press <kbd class="kbd kbd-xs">Escape</kbd> or release outside a valid target to cancel edge creation.</p>
+                </div>
+              </div>
+            </div>
+
+            <%!-- Selection & Keyboard Shortcuts --%>
+            <div>
+              <h3 class="text-lg font-semibold text-success mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Selection & Shortcuts
+              </h3>
+              <div class="space-y-3">
+                <div class="pl-4 border-l-2 border-success/30">
+                  <h4 class="font-medium mb-1">Single Selection</h4>
+                  <p class="text-sm text-base-content/70">Click a node to select it. Selected nodes have a blue border and ring effect.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-success/30">
+                  <h4 class="font-medium mb-1">Multi-Select</h4>
+                  <p class="text-sm text-base-content/70">Hold <kbd class="kbd kbd-xs">Shift</kbd> or <kbd class="kbd kbd-xs">Cmd/Ctrl</kbd> and click to add/remove nodes from selection.</p>
+                </div>
+                <div class="pl-4 border-l-2 border-success/30">
+                  <h4 class="font-medium mb-1">Keyboard Shortcuts</h4>
+                  <p class="text-sm text-base-content/70">
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+A</kbd> Select all • 
+                    <kbd class="kbd kbd-xs">Escape</kbd> Clear selection • 
+                    <kbd class="kbd kbd-xs">Delete</kbd> Delete selected
+                  </p>
                 </div>
               </div>
             </div>

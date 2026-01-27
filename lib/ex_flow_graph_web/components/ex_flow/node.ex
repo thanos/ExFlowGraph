@@ -5,14 +5,19 @@ defmodule ExFlowGraphWeb.ExFlow.Node do
   attr :title, :string, required: true
   attr :x, :integer, default: 0
   attr :y, :integer, default: 0
+  attr :selected, :boolean, default: false
 
   def node(assigns) do
     ~H"""
     <div
-      class="exflow-node absolute select-none rounded-lg border border-base-300 bg-base-100/90 shadow-sm backdrop-blur px-3 py-2 text-sm text-base-content cursor-grab active:cursor-grabbing pointer-events-auto"
+      class={[
+        "exflow-node absolute select-none rounded-lg border bg-base-100/90 shadow-sm backdrop-blur px-3 py-2 text-sm text-base-content cursor-grab active:cursor-grabbing pointer-events-auto transition-all",
+        if(@selected, do: "border-primary border-2 ring-2 ring-primary/30 shadow-lg", else: "border-base-300")
+      ]}
       data-id={@id}
       data-x={@x}
       data-y={@y}
+      data-selected={@selected}
       style={"transform: translate(#{@x}px, #{@y}px);"}
     >
       <div class="font-medium">{@title}</div>

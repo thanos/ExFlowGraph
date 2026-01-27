@@ -14,6 +14,9 @@ export default {
     this.rafId = null
     this.perfMonitor = { dragStart: 0, frameCount: 0, slowFrames: 0 }
     
+    // Selection state
+    this.marquee = null // { startX, startY, currentX, currentY }
+    
     // Get the container element that will be transformed
     this.container = this.el.querySelector(".exflow-container") || this.el
     
@@ -33,18 +36,22 @@ export default {
       
       const nodeEl = e.target.closest(".exflow-node")
       
-      // If clicking on a node, start node drag
+      // If clicking on a node, handle selection and/or drag
       if (nodeEl && this.el.contains(nodeEl)) {
         e.preventDefault()
 
         const id = nodeEl.dataset.id
+        const isMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey
+        
+        // Handle selection
+        this.pushEvent("select_node", { id, multi: isMultiSelect.toString() })
+        
         const startX = e.clientX
         const startY = e.clientY
         const originX = parseFloat(nodeEl.dataset.x || "0")
         const originY = parseFloat(nodeEl.dataset.y || "0")
 
         this.drag = { id, nodeEl, startX, startY, originX, originY }
-        nodeEl.classList.add("ring-2", "ring-primary/60")
         nodeEl.style.willChange = "transform" // Optimize rendering
         
         // Start performance monitoring
@@ -186,8 +193,34 @@ export default {
       this.applyTransform()
     }
 
+    this.onKeyDown = (e) => {
+      // Escape: clear selection
+      if (e.key === "Escape") {
+        this.pushEvent("deselect_all", {})
+        return
+      }
+      
+      // Delete/Backspace: delete selected nodes
+      if (e.key === "Delete" || e.key === "Backspace") {
+        // Only if not typing in an input
+        if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
+          e.preventDefault()
+          this.pushEvent("delete_selected", {})
+        }
+        return
+      }
+      
+      // Cmd/Ctrl+A: select all
+      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+        e.preventDefault()
+        this.pushEvent("select_all", {})
+        return
+      }
+    }
+
     this.el.addEventListener("mousedown", this.onMouseDown)
     this.el.addEventListener("wheel", this.onWheel, { passive: false })
+    window.addEventListener("keydown", this.onKeyDown)
     this.el.style.cursor = "grab"
 
     // Initial edge layout once DOM is ready
@@ -208,6 +241,7 @@ export default {
     this.el.removeEventListener("wheel", this.onWheel)
     window.removeEventListener("mousemove", this.onMouseMove)
     window.removeEventListener("mousemove", this.onPanMove)
+    window.removeEventListener("keydown", this.onKeyDown)
   },
   
   redrawAllEdges() {
