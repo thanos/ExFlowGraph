@@ -1,179 +1,34 @@
-# ExFlow
+# ExFlowGraph
 
-A simple and powerful Elixir library for building flow-based graphs. Perfect for workflow engines, data pipelines, visual programming tools, and AI agent orchestration.
+ExFlowGraph is a "batteries-included" Elixir library for building interactive, node-based editors in Phoenix LiveView. It provides a flexible and extensible component for creating visual workflows, state machines, diagramming tools, and more.
 
-[![CI](https://github.com/your-repo/ExFlowGraph/workflows/CI/badge.svg)](https://github.com/your-repo/ExFlowGraph/actions)
-[![Hex.pm](https://img.shields.io/hexpm/v/ex_flow.svg)](https://hex.pm/packages/ex_flow)
-[![Documentation](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/ex_flow)
-
-## Features
-
-- 🎯 **Simple API** - Intuitive functions for creating and manipulating graphs
-- 🔄 **Immutable** - Functional approach with immutable data structures
-- 💾 **Persistent** - Multiple storage backends (in-memory, PostgreSQL)
-- 🎨 **Visual** - Includes Phoenix LiveView demo with drag-and-drop editor
-- 🧪 **Well-tested** - Comprehensive test suite with Mox for mocking
-- 📚 **Documented** - Extensive documentation and examples
-
-## Quick Start
-
-### Installation
-
-Add to your `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:ex_flow, "~> 0.1.0"}
-  ]
-end
-```
-
-### Basic Usage
-
-```elixir
-# Create a workflow
-graph =
-  ExFlow.new()
-  |> ExFlow.add_node!("start", :trigger, x: 0, y: 0, label: "Start")
-  |> ExFlow.add_node!("process", :task, x: 200, y: 0, label: "Process Data")
-  |> ExFlow.add_node!("end", :output, x: 400, y: 0, label: "Complete")
-  |> ExFlow.add_edge!("e1", "start", "process")
-  |> ExFlow.add_edge!("e2", "process", "end")
-
-# Save it
-:ok = ExFlow.save(graph, "my-workflow")
-
-# Load it back
-{:ok, graph} = ExFlow.load("my-workflow")
-```
-
-## Documentation
-
-- **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
-- **[Usage Guide](docs/USAGE_GUIDE.md)** - Comprehensive examples and patterns
-- **[API Reference](https://hexdocs.pm/ex_flow)** - Complete API documentation
-- **[Demo Application](demo/README.md)** - Full Phoenix LiveView example
-
-## Repository Structure
-
-This is a monorepo containing:
-
-- **`lib/`** - ExFlow library source code
-- **`test/`** - Library tests
-- **`demo/`** - Phoenix LiveView demo application
-- **`docs/`** - Documentation and guides
-
-## Demo Application
-
-The `demo` directory contains a complete Phoenix application showcasing ExFlow's capabilities:
-
-<img width="600" alt="ExFlow Visual Editor" src="https://github.com/user-attachments/assets/eca96766-2ace-4b61-8380-ce745ab3ca0e" />
+[Screenshot or GIF of the editor in action]
 
 ### Features
 
-- 🎨 Visual graph editor with drag-and-drop
-- 🔄 Real-time collaboration
-- ↩️ Undo/Redo support
-- 💾 PostgreSQL persistence
-- 📋 Pre-built example workflows
+-   **LiveView First:** Designed from the ground up to be a seamless part of the LiveView programming model.
+-   **Controlled Component:** Your LiveView remains the source of truth for all state, making validation and persistence trivial.
+-   **Rich Interactivity:** Out-of-the-box support for dragging, panning, zooming, connecting, and selecting nodes/edges.
+-   **Extensible:** Customize node appearance, add toolbars, and build complex user experiences.
+-   **Persistence Included:** Comes with patterns and helpers for Ecto-based persistence, including optimistic locking.
 
-### Running the Demo
+## Getting Started
 
-```bash
-cd demo
-mix setup
-mix phx.server
-```
+The best way to get started is with the LiveView Quickstart guide. You can have an interactive editor running in your application in under 15 minutes.
 
-Visit [http://localhost:4000](http://localhost:4000)
+1.  **[Installation](docs/01_INSTALLATION.md)**: Add the dependency and configure your assets.
+2.  **[LiveView Quickstart](docs/02_QUICKSTART_LIVEVIEW.md)**: Add the component to your LiveView and make it interactive.
 
-## Example Workflows
+## Documentation
 
-### Sequential Processing
+-   **[00 - Overview](docs/00_OVERVIEW.md)**
+-   **[01 - Installation](docs/01_INSTALLATION.md)**
+-   **[02 - LiveView Quickstart](docs/02_QUICKSTART_LIVEVIEW.md)**
+-   **[03 - Component API](docs/03_COMPONENT_API.md)**
+-   **[04 - Persistence and CRUD](docs/04_PERSISTENCE_AND_CRUD.md)**
+-   **[05 - Recipes](docs/05_RECIPES.md)**
+-   **[06 - Troubleshooting](docs/06_TROUBLESHOOTING.md)**
 
-```elixir
-ExFlow.new()
-|> ExFlow.add_node!("step1", :task, x: 0, y: 0, label: "Step 1")
-|> ExFlow.add_node!("step2", :task, x: 200, y: 0, label: "Step 2")
-|> ExFlow.add_node!("step3", :task, x: 400, y: 0, label: "Step 3")
-|> ExFlow.add_edge!("e1", "step1", "step2")
-|> ExFlow.add_edge!("e2", "step2", "step3")
-```
+## Philosophy
 
-### Conditional Branching
-
-```elixir
-ExFlow.new()
-|> ExFlow.add_node!("start", :trigger, x: 0, y: 100)
-|> ExFlow.add_node!("decision", :decision, x: 200, y: 100)
-|> ExFlow.add_node!("path-a", :task, x: 400, y: 50)
-|> ExFlow.add_node!("path-b", :task, x: 400, y: 150)
-|> ExFlow.add_edge!("e1", "start", "decision")
-|> ExFlow.add_edge!("e2", "decision", "path-a", source_handle: "yes")
-|> ExFlow.add_edge!("e3", "decision", "path-b", source_handle: "no")
-```
-
-### Parallel Processing
-
-```elixir
-ExFlow.new()
-|> ExFlow.add_node!("start", :trigger, x: 0, y: 100)
-|> ExFlow.add_node!("worker1", :task, x: 200, y: 50)
-|> ExFlow.add_node!("worker2", :task, x: 200, y: 100)
-|> ExFlow.add_node!("worker3", :task, x: 200, y: 150)
-|> ExFlow.add_node!("merge", :task, x: 400, y: 100)
-|> ExFlow.add_edge!("e1", "start", "worker1")
-|> ExFlow.add_edge!("e2", "start", "worker2")
-|> ExFlow.add_edge!("e3", "start", "worker3")
-|> ExFlow.add_edge!("e4", "worker1", "merge")
-|> ExFlow.add_edge!("e5", "worker2", "merge")
-|> ExFlow.add_edge!("e6", "worker3", "merge")
-```
-
-See [Usage Guide](docs/USAGE_GUIDE.md) for more examples including ETL pipelines, AI agents, and order processing workflows.
-
-## Configuration
-
-### In-Memory Storage (Development)
-
-```elixir
-# config/dev.exs
-config :ex_flow, :storage, ExFlow.Storage.InMemory
-```
-
-### Database Storage (Production)
-
-```elixir
-# config/prod.exs
-config :ex_flow, :storage, ExFlow.Storage.Ecto
-config :ex_flow, :repo, MyApp.Repo
-```
-
-## Testing
-
-```bash
-# Run all tests
-mix test
-
-# Run with coverage
-mix coveralls
-
-# Run specific test file
-mix test test/ex_flow/core/graph_test.exs
-```
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Resources
-
-- [Documentation](https://hexdocs.pm/ex_flow)
-- [GitHub Issues](https://github.com/your-repo/ExFlowGraph/issues)
-- [Changelog](CHANGELOG.md)
-- [Phoenix Framework](https://www.phoenixframework.org/)
+ExFlowGraph follows the "controlled component" pattern. It does not manage its own state. Instead, it renders the graph state you provide and emits events when the user interacts with it. Your LiveView code is the single source of truth, deciding how to update the state in response to these events. This makes the component highly predictable, testable, and easy to integrate with your application's business logic.
