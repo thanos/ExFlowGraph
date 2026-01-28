@@ -4,11 +4,11 @@ A complete Phoenix LiveView application demonstrating how to use ExFlow for buil
 
 ## Features
 
-- 🎨 **Visual Graph Editor** - Drag-and-drop interface for creating workflows
-- 🔄 **Real-time Collaboration** - Multiple users can edit the same workflow simultaneously
-- 💾 **Persistent Storage** - Save and load workflows from PostgreSQL
-- ↩️ **Undo/Redo** - Full history management for graph operations
-- 🎯 **Example Workflows** - Pre-built templates for common patterns
+- **Visual Graph Editor** - Drag-and-drop interface for creating workflows
+- **Real-time Collaboration** - Multiple users can edit the same workflow simultaneously
+- **Persistent Storage** - Save and load workflows from PostgreSQL
+- **Undo/Redo** - Full history management for graph operations
+- **Example Workflows** - Pre-built templates for common patterns
 
 ## Quick Start
 
@@ -449,8 +449,7 @@ ExFlow.save(graph, "test")
 
 - [ExFlow Documentation](../../docs/USAGE_GUIDE.md)
 - [Quick Start Guide](../../docs/QUICK_START.md)
-- [API Reference](https://hexdocs.pm/ex_flow)
-- [GitHub Repository](https://github.com/your-repo/ExFlowGraph)
+- [GitHub Repository](https://github.com/thanos/ExFlowGraph)
 
 ## License
 
