@@ -194,9 +194,8 @@ defmodule ExFlow.Core.Graph do
 
   @spec from_map(%{nodes: [graph_node()], edges: [graph_edge()]}) :: {:ok, t()} | {:error, term()}
   def from_map(%{nodes: nodes, edges: edges}) when is_list(nodes) and is_list(edges) do
-    with {:ok, graph_with_nodes} <- add_nodes(new(), nodes),
-         {:ok, graph_with_edges} <- add_edges(graph_with_nodes, edges) do
-      {:ok, graph_with_edges}
+    with {:ok, graph_with_nodes} <- add_nodes(new(), nodes) do
+      add_edges(graph_with_nodes, edges)
     end
   end
 

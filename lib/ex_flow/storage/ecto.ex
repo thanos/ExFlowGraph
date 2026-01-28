@@ -9,13 +9,12 @@ defmodule ExFlow.Storage.Ecto do
 
   alias ExFlow.GraphRecord
   alias ExFlow.Serializer
-  alias ExFlowGraph.Repo
 
   import Ecto.Query
 
   @impl true
   def load(name) when is_binary(name) do
-    case Repo.get_by(GraphRecord, name: name) do
+    case repo().get_by(GraphRecord, name: name) do
       nil ->
         {:error, :not_found}
 
@@ -43,12 +42,12 @@ defmodule ExFlow.Storage.Ecto do
 
   @impl true
   def delete(name) when is_binary(name) do
-    case Repo.get_by(GraphRecord, name: name) do
+    case repo().get_by(GraphRecord, name: name) do
       nil ->
         {:error, :not_found}
 
       record ->
-        case Repo.delete(record) do
+        case repo().delete(record) do
           {:ok, _} -> :ok
           {:error, changeset} -> {:error, changeset}
         end
@@ -59,16 +58,16 @@ defmodule ExFlow.Storage.Ecto do
   def list do
     GraphRecord
     |> select([g], g.name)
-    |> Repo.all()
+    |> repo().all()
   end
 
   defp upsert_graph(name, data) do
-    case Repo.get_by(GraphRecord, name: name) do
+    case repo().get_by(GraphRecord, name: name) do
       nil ->
         # Insert new record
         %GraphRecord{}
         |> GraphRecord.changeset(%{name: name, data: data, version: 1})
-        |> Repo.insert()
+        |> repo().insert()
         |> handle_result()
 
       existing ->
@@ -78,11 +77,13 @@ defmodule ExFlow.Storage.Ecto do
           data: data,
           version: existing.version + 1
         })
-        |> Repo.update()
+        |> repo().update()
         |> handle_result()
     end
   end
 
   defp handle_result({:ok, _record}), do: :ok
   defp handle_result({:error, changeset}), do: {:error, changeset}
+
+  defp repo, do: Application.fetch_env!(:ex_flow, :repo)
 end
