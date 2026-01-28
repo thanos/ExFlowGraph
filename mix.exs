@@ -30,6 +30,7 @@ defmodule ExFlow.MixProject do
 
   def application do
     [
+      mod: {ExFlow.Application, []},
       extra_applications: [:logger]
     ]
   end

@@ -23,7 +23,8 @@ defmodule ExFlow.Core.Graph do
           source: String.t(),
           source_handle: String.t(),
           target: String.t(),
-          target_handle: String.t()
+          target_handle: String.t(),
+          metadata: map()
         }
 
   @type t :: LibGraph.t()
@@ -51,16 +52,17 @@ defmodule ExFlow.Core.Graph do
     end
   end
 
-  @spec add_edge(t(), String.t(), String.t(), String.t(), String.t(), String.t()) ::
+  @spec add_edge(t(), String.t(), String.t(), String.t(), String.t(), String.t(), map()) ::
           {:ok, t()} | {:error, term()}
-  def add_edge(%LibGraph{} = graph, id, source_id, source_handle, target_id, target_handle)
+  def add_edge(%LibGraph{} = graph, id, source_id, source_handle, target_id, target_handle, metadata \\ %{})
       when is_binary(id) and is_binary(source_id) and is_binary(target_id) do
     edge_meta = %{
       id: id,
       source: source_id,
       source_handle: source_handle,
       target: target_id,
-      target_handle: target_handle
+      target_handle: target_handle,
+      metadata: metadata
     }
 
     with :ok <- validate_edge(edge_meta),
@@ -152,7 +154,7 @@ defmodule ExFlow.Core.Graph do
     |> LibGraph.edges()
     |> Enum.flat_map(fn edge ->
       case edge.label do
-        %{id: _, source: _, target: _, source_handle: _, target_handle: _} = edge_meta ->
+        %{id: _, source: _, target: _, source_handle: _, target_handle: _, metadata: _} = edge_meta ->
           [edge_meta]
 
         _ ->
@@ -175,10 +177,11 @@ defmodule ExFlow.Core.Graph do
         source: source,
         source_handle: sh,
         target: target,
-        target_handle: th
+        target_handle: th,
+        metadata: metadata
       })
       when is_binary(id) and is_binary(source) and is_binary(sh) and is_binary(target) and
-             is_binary(th) do
+             is_binary(th) and is_map(metadata) do
     :ok
   end
 
@@ -194,8 +197,9 @@ defmodule ExFlow.Core.Graph do
 
   @spec from_map(%{nodes: [graph_node()], edges: [graph_edge()]}) :: {:ok, t()} | {:error, term()}
   def from_map(%{nodes: nodes, edges: edges}) when is_list(nodes) and is_list(edges) do
-    with {:ok, graph_with_nodes} <- add_nodes(new(), nodes) do
-      add_edges(graph_with_nodes, edges)
+    with {:ok, graph_with_nodes} <- add_nodes(new(), nodes),
+         {:ok, graph_with_edges} <- add_edges(graph_with_nodes, edges) do
+      {:ok, graph_with_edges}
     end
   end
 
@@ -223,7 +227,8 @@ defmodule ExFlow.Core.Graph do
              edge.source,
              edge.source_handle,
              edge.target,
-             edge.target_handle
+             edge.target_handle,
+             Map.get(edge, :metadata, %{})
            ) do
         {:ok, new_graph} -> {:cont, {:ok, new_graph}}
         error -> {:halt, error}

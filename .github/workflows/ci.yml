@@ -73,13 +73,15 @@ jobs:
       - name: Run tests
         run: mix test --trace
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ex_flow_test
+          POSTGRES_HOST: postgres
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432/ex_flow_test
 
       - name: Generate coverage report
         if: matrix.coverage
         run: mix test --cover
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ex_flow_test
+          POSTGRES_HOST: postgres
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432/ex_flow_test
 
   test_demo:
     name: Test Demo (Elixir ${{ env.ELIXIR_VERSION }} / OTP ${{ env.OTP_VERSION }})
@@ -132,7 +134,8 @@ jobs:
         working-directory: demo
         run: mix test --trace
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ex_flow_graph_test
+          POSTGRES_HOST: postgres
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432/ex_flow_graph_test
 
   code_quality:
     name: Code Quality

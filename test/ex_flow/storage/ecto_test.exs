@@ -1,5 +1,8 @@
 defmodule ExFlow.Storage.EctoTest do
   use ExFlow.DataCase, async: true
+  
+  @moduletag :integration
+  @moduletag :ecto
 
   alias ExFlow.Core.Graph, as: FlowGraph
   alias ExFlow.GraphRecord

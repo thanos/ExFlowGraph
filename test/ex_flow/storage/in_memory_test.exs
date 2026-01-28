@@ -123,7 +123,8 @@ defmodule ExFlow.Storage.InMemoryTest do
       assert {:error, :not_found} = InMemory.load("to-delete")
     end
 
-    test "returns ok when deleting non-existent graph" do
+    test "returns ok when deleting non-existent graph (idempotent)" do
+      # Delete is idempotent - returns :ok even if graph doesn't exist
       assert :ok = InMemory.delete("non-existent")
     end
 

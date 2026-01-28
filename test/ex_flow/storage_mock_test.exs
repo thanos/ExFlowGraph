@@ -122,17 +122,24 @@ defmodule ExFlow.StorageMockTest do
   end
 
   describe "testing code that uses storage" do
-    test "can test a function that depends on storage" do
-      # Example: testing a hypothetical function that uses storage
-      defmodule GraphManager do
-        def save_and_verify(storage, id, graph) do
-          with :ok <- storage.save(id, graph),
-               {:ok, loaded} <- storage.load(id) do
-            {:ok, loaded}
-          end
+    defmodule GraphManager do
+      def save_and_verify(storage, id, graph) do
+        with :ok <- storage.save(id, graph),
+             {:ok, loaded} <- storage.load(id) do
+          {:ok, loaded}
         end
       end
 
+      def safe_load(storage, id) do
+        case storage.load(id) do
+          {:ok, graph} -> {:ok, graph}
+          {:error, :not_found} -> {:ok, FlowGraph.new()}
+          {:error, reason} -> {:error, reason}
+        end
+      end
+    end
+
+    test "can test a function that depends on storage" do
       graph = FlowGraph.new()
       {:ok, graph} = FlowGraph.add_node(graph, "node-1", :task, %{position: %{x: 100, y: 100}})
 
@@ -146,16 +153,6 @@ defmodule ExFlow.StorageMockTest do
     end
 
     test "can test error handling with mocks" do
-      defmodule GraphManager do
-        def safe_load(storage, id) do
-          case storage.load(id) do
-            {:ok, graph} -> {:ok, graph}
-            {:error, :not_found} -> {:ok, FlowGraph.new()}
-            {:error, reason} -> {:error, reason}
-          end
-        end
-      end
-
       # Mock not found scenario
       expect(Mock, :load, fn "missing" -> {:error, :not_found} end)
       assert {:ok, graph} = GraphManager.safe_load(Mock, "missing")
@@ -176,7 +173,7 @@ defmodule ExFlow.StorageMockTest do
       {:ok, graph2} = FlowGraph.add_node(graph2, "node-2", :agent, %{position: %{x: 200, y: 200}})
 
       # Different behavior based on ID
-      expect(Mock, :load, fn
+      expect(Mock, :load, 3, fn
         "graph-1" -> {:ok, graph1}
         "graph-2" -> {:ok, graph2}
         _ -> {:error, :not_found}
