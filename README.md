@@ -2,7 +2,9 @@
 
 ExFlowGraph is a "batteries-included" Elixir library for building interactive, node-based editors in Phoenix LiveView. It provides a flexible and extensible component for creating visual workflows, state machines, diagramming tools, and more.
 
-[Screenshot or GIF of the editor in action]
+![graphs](https://github.com/user-attachments/assets/1b215aeb-01fa-40f0-acb0-ed52b922e9d5)
+
+
 
 ### Features
 
