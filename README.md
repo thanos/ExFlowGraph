@@ -8,12 +8,12 @@ A simple and powerful Elixir library for building flow-based graphs. Perfect for
 
 ## Features
 
-- 🎯 **Simple API** - Intuitive functions for creating and manipulating graphs
-- 🔄 **Immutable** - Functional approach with immutable data structures
-- 💾 **Persistent** - Multiple storage backends (in-memory, PostgreSQL)
-- 🎨 **Visual** - Includes Phoenix LiveView demo with drag-and-drop editor
-- 🧪 **Well-tested** - Comprehensive test suite with Mox for mocking
-- 📚 **Documented** - Extensive documentation and examples
+- **Simple API** - Intuitive functions for creating and manipulating graphs
+- **Immutable** - Functional approach with immutable data structures
+- **Persistent** - Multiple storage backends (in-memory, PostgreSQL)
+- **Visual** - Includes Phoenix LiveView demo with drag-and-drop editor
+- **Well-tested** - Comprehensive test suite with Mox for mocking
+- **Documented** - Extensive documentation and examples
 
 ## Quick Start
 
@@ -72,11 +72,11 @@ The `demo` directory contains a complete Phoenix application showcasing ExFlow's
 
 ### Features
 
-- 🎨 Visual graph editor with drag-and-drop
-- 🔄 Real-time collaboration
-- ↩️ Undo/Redo support
-- 💾 PostgreSQL persistence
-- 📋 Pre-built example workflows
+- Visual graph editor with drag-and-drop
+- Real-time collaboration
+- Undo/Redo support
+- PostgreSQL persistence
+- Pre-built example workflows
 
 ### Running the Demo
 
@@ -163,9 +163,6 @@ mix coveralls
 mix test test/ex_flow/core/graph_test.exs
 ```
 
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 
@@ -173,7 +170,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Resources
 
-- [Documentation](https://hexdocs.pm/ex_flow)
-- [GitHub Issues](https://github.com/your-repo/ExFlowGraph/issues)
+
+- [GitHub Issues](https://github.com/thanos/ExFlowGraph/issues)
 - [Changelog](CHANGELOG.md)
 - [Phoenix Framework](https://www.phoenixframework.org/)
