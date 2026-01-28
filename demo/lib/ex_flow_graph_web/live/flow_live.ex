@@ -83,7 +83,7 @@ defmodule ExFlowGraphWeb.FlowLive do
 
     ~H"""
     <Layouts.app flash={@flash}>
-      <div class="mx-auto max-w-6xl">
+      <div class="mx-auto max-w-xl">
         <div class="flex items-end justify-between gap-6">
           <div>
             <h1 class="text-2xl font-semibold tracking-tight">ExFlow</h1>
@@ -93,7 +93,7 @@ defmodule ExFlowGraphWeb.FlowLive do
           </div>
         </div>
 
-        <div class="mt-6">
+        <div class="mt-6  h-[400px]">
           <ExFlowGraphWeb.ExFlow.Canvas.canvas id="exflow-canvas" nodes={@nodes} edges={@edges} />
         </div>
       </div>
