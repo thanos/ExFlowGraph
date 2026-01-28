@@ -59,3 +59,8 @@ npm-debug.log
 /.credo/
 /demo/.credo/
 
+/local_docs/
+
+AGENTS.md
+
+
