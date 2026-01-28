@@ -10,6 +10,9 @@ A complete Phoenix LiveView application demonstrating how to use ExFlow for buil
 - **Undo/Redo** - Full history management for graph operations
 - **Example Workflows** - Pre-built templates for common patterns
 
+<img width="500"  alt="Screenshot 2026-01-28 at 12 38 28 (2)" src="https://github.com/user-attachments/assets/26cdca1f-d879-4c1d-b4b5-b9c3b6506006" />
+
+
 ## Quick Start
 
 ### Prerequisites
