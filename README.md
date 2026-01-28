@@ -13,6 +13,9 @@ Tests for the library are in the `test` directory.
 
 The `demo` directory contains a Phoenix application that demonstrates the features of the `ex_flow` library.
 
+<img width="600" alt="Screenshot 2026-01-28 at 08 52 57" src="https://github.com/user-attachments/assets/eca96766-2ace-4b61-8380-ce745ab3ca0e" />
+
+
 ### To start the demo server:
 
 * Change into the demo directory: `cd demo`
