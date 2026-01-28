@@ -21,7 +21,7 @@ The best way to get started is with the LiveView Quickstart guide. You can have 
 
 1.  **[Installation](docs/01_INSTALLATION.md)**: Add the dependency and configure your assets.
 2.  **[LiveView Quickstart](docs/02_QUICKSTART_LIVEVIEW.md)**: Add the component to your LiveView and make it interactive.
-
+3.   **[see the Demo](demo/README.md)**: A multi-user Phoenix site that demos most of the features
 ## Documentation
 
 -   **[00 - Overview](docs/00_OVERVIEW.md)**
