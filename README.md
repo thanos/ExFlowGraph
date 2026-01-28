@@ -2,9 +2,7 @@
 
 A simple and powerful Elixir library for building flow-based graphs. Perfect for workflow engines, data pipelines, visual programming tools, and AI agent orchestration.
 
-[![CI](https://github.com/your-repo/ExFlowGraph/workflows/CI/badge.svg)](https://github.com/your-repo/ExFlowGraph/actions)
-[![Hex.pm](https://img.shields.io/hexpm/v/ex_flow.svg)](https://hex.pm/packages/ex_flow)
-[![Documentation](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/ex_flow)
+
 
 ## Features
 
