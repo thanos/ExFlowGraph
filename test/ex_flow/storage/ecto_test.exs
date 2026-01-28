@@ -1,10 +1,13 @@
 defmodule ExFlow.Storage.EctoTest do
-  use ExFlowGraph.DataCase, async: true
+  use ExFlow.DataCase, async: true
+  
+  @moduletag :integration
+  @moduletag :ecto
 
   alias ExFlow.Core.Graph, as: FlowGraph
   alias ExFlow.GraphRecord
   alias ExFlow.Storage.Ecto, as: EctoStorage
-  alias ExFlowGraph.Repo
+  alias ExFlow.Test.Repo
 
   describe "save/2 and load/1" do
     test "saves and loads a graph successfully" do

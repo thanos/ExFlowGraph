@@ -1,4 +1,4 @@
-defmodule ExFlowGraph.Repo.Migrations.CreateGraphs do
+defmodule ExFlow.Repo.Migrations.CreateGraphs do
   use Ecto.Migration
 
   def change do

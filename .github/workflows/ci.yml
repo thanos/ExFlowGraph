@@ -12,8 +12,8 @@ env:
   OTP_VERSION: "27.1"
 
 jobs:
-  test:
-    name: Test (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }})
+  test_library:
+    name: Test Library (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -37,7 +37,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: ex_flow_graph_test
+          POSTGRES_DB: ex_flow_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -55,28 +55,17 @@ jobs:
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
-          
-      - name: Ensure cache directories exist
-        run: mkdir -p $(pwd)/deps $(pwd)/_build
-        
-      - name: Debug cache paths
-        run: ls -al $(pwd)
-        
+
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          path: deps
+          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-
 
       - name: Install dependencies
         run: mix deps.get
-
-      - name: Compile dependencies
-        run: mix deps.compile
 
       - name: Compile application
         run: mix compile --warnings-as-errors
@@ -84,13 +73,69 @@ jobs:
       - name: Run tests
         run: mix test --trace
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ex_flow_graph_test
+          POSTGRES_HOST: postgres
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432/ex_flow_test
 
       - name: Generate coverage report
         if: matrix.coverage
         run: mix test --cover
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ex_flow_graph_test
+          POSTGRES_HOST: postgres
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432/ex_flow_test
+
+  test_demo:
+    name: Test Demo (Elixir ${{ env.ELIXIR_VERSION }} / OTP ${{ env.OTP_VERSION }})
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ex_flow_graph_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: demo/deps
+          key: ${{ runner.os }}-mix-demo-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('demo/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-demo-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
+
+      - name: Install dependencies
+        working-directory: demo
+        run: mix deps.get
+
+      - name: Compile application
+        working-directory: demo
+        run: mix compile --warnings-as-errors
+
+      - name: Build assets
+        working-directory: demo
+        run: mix assets.build
+      
+      - name: Run tests
+        working-directory: demo
+        run: mix test --trace
+        env:
+          POSTGRES_HOST: postgres
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432/ex_flow_graph_test
 
   code_quality:
     name: Code Quality
@@ -108,10 +153,8 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('**/mix.lock') }}
+          path: deps
+          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
 
@@ -130,47 +173,6 @@ jobs:
       - name: Check for security vulnerabilities
         run: mix deps.audit
 
-  assets:
-    name: Assets & Frontend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Elixir
-        uses: erlef/setup-beam@v1
-        with:
-          elixir-version: ${{ env.ELIXIR_VERSION }}
-          otp-version: ${{ env.OTP_VERSION }}
-
-      - name: Restore dependencies cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
-
-      - name: Install dependencies
-        run: mix deps.get
-
-      - name: Setup assets
-        run: mix assets.setup
-
-      - name: Build assets
-        run: mix assets.build
-
-      - name: Check for asset build errors
-        run: |
-          if [ -d "priv/static/assets" ]; then
-            echo "Assets built successfully"
-          else
-            echo "Asset build failed"
-            exit 1
-          fi
-
   dialyzer:
     name: Dialyzer (Type Checking)
     runs-on: ubuntu-latest
@@ -187,10 +189,8 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('**/mix.lock') }}
+          path: deps
+          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
 
@@ -199,7 +199,7 @@ jobs:
         id: plt-cache
         with:
           path: priv/plts
-          key: ${{ runner.os }}-plt-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-plt-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-plt-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
 
@@ -215,14 +215,14 @@ jobs:
   all_checks:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [test, code_quality, assets, dialyzer]
+    needs: [test_library, test_demo, code_quality, dialyzer]
     if: always()
     steps:
       - name: Check all jobs
         run: |
-          if [[ "${{ needs.test.result }}" == "success" && \
+          if [[ "${{ needs.test_library.result }}" == "success" && \
+                "${{ needs.test_demo.result }}" == "success" && \
                 "${{ needs.code_quality.result }}" == "success" && \
-                "${{ needs.assets.result }}" == "success" && \
                 "${{ needs.dialyzer.result }}" == "success" ]]; then
             echo "All checks passed!"
             exit 0

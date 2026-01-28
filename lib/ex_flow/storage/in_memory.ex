@@ -32,12 +32,8 @@ defmodule ExFlow.Storage.InMemory do
 
   @impl true
   def delete(id) do
-    Agent.get_and_update(__MODULE__, fn state ->
-      case Map.has_key?(state, id) do
-        true -> {:ok, Map.delete(state, id)}
-        false -> {{:error, :not_found}, state}
-      end
-    end)
+    Agent.update(__MODULE__, &Map.delete(&1, id))
+    :ok
   end
 
   @impl true
