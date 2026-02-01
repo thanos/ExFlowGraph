@@ -1,11 +1,11 @@
 /* See the Tailwind configuration guide for advanced usage
    https://tailwindcss.com/docs/configuration */
 
-@import "tailwindcss" source(none);
+@import "tailwindcss";
 @source "../css";
 @source "../js";
 @source "../../lib/demo_web";
-@source "../../lib/ex_flow_graph_web/**/*.{ex,exs,heex}";
+@source "../../lib/ex_flow_graph_web";
 
 /* A Tailwind plugin that makes "hero-#{ICON}" classes available.
    The heroicons installation itself is managed by your mix.exs */
