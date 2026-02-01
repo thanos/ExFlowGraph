@@ -21,9 +21,10 @@ defmodule DemoWeb.Components.TailwindSafelist do
       <span class="exflow-handle exflow-handle-target inline-flex size-2 rounded-full bg-base-content/40 cursor-crosshair hover:scale-150 transition-transform"></span>
 
       <!-- Edge classes -->
-      <svg><path class="exflow-edge stroke-base-content/50 hover:stroke-base-content/80"></path></svg>
+      <svg><path class="exflow-edge stroke-base-content/50 hover:stroke-base-content/80 transition-colors stroke-primary stroke-2 stroke-4"></path></svg>
       <svg class="absolute inset-0 z-0 h-full w-full pointer-events-none"></svg>
       <div class="absolute inset-0 z-10 pointer-events-none"></div>
+      <path style="cursor: pointer;"></path>
     </div>
     """
   end

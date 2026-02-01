@@ -7,35 +7,42 @@ defmodule ExFlow.Commands.CreateEdgeCommand do
 
   alias ExFlow.Core.Graph
 
-  defstruct [:edge_id, :source_id, :source_handle, :target_id, :target_handle]
+  defstruct [:edge_id, :source_id, :source_handle, :target_id, :target_handle, :label, :metadata]
 
   @type t :: %__MODULE__{
           edge_id: String.t(),
           source_id: String.t(),
           source_handle: String.t(),
           target_id: String.t(),
-          target_handle: String.t()
+          target_handle: String.t(),
+          label: String.t() | nil,
+          metadata: map()
         }
 
-  def new(edge_id, source_id, source_handle, target_id, target_handle) do
+  def new(edge_id, source_id, source_handle, target_id, target_handle, opts \\ %{}) do
     %__MODULE__{
       edge_id: edge_id,
       source_id: source_id,
       source_handle: source_handle,
       target_id: target_id,
-      target_handle: target_handle
+      target_handle: target_handle,
+      label: Map.get(opts, :label),
+      metadata: Map.get(opts, :metadata, %{})
     }
   end
 
   @impl ExFlow.Command
   def execute(%__MODULE__{} = cmd, graph) do
+    opts = %{label: cmd.label, metadata: cmd.metadata}
+
     Graph.add_edge(
       graph,
       cmd.edge_id,
       cmd.source_id,
       cmd.source_handle,
       cmd.target_id,
-      cmd.target_handle
+      cmd.target_handle,
+      opts
     )
   end
 

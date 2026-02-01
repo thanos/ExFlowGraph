@@ -29,6 +29,7 @@ defmodule DemoWeb.HomeLive do
       |> assign(:show_load_modal, false)
       |> assign(:show_help, false)
       |> assign(:selected_node_ids, MapSet.new())
+      |> assign(:selected_edge_ids, MapSet.new())
       |> assign(:history, ExFlow.HistoryManager.new())
 
     {:ok, socket}
@@ -244,8 +245,69 @@ defmodule DemoWeb.HomeLive do
   end
 
   @impl true
+  def handle_event("option_click_node", %{"id" => id}, socket) do
+    # Option/Alt + click on node - show node details
+    node = FlowGraph.get_nodes(socket.assigns.graph)
+           |> Enum.find(&(&1.id == id))
+
+    if node do
+      IO.puts("\n=== Option+Click Node ===")
+      IO.puts("ID: #{node.id}")
+      IO.puts("Type: #{node.type}")
+      IO.puts("Label: #{inspect(node.label)}")
+      IO.puts("Position: #{inspect(node.position)}")
+      IO.puts("Metadata: #{inspect(node.metadata)}")
+      IO.puts("========================\n")
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("option_click_edge", %{"id" => id}, socket) do
+    # Option/Alt + click on edge - show edge details
+    edge = FlowGraph.get_edges(socket.assigns.graph)
+           |> Enum.find(&(&1.id == id))
+
+    if edge do
+      IO.puts("\n=== Option+Click Edge ===")
+      IO.puts("ID: #{edge.id}")
+      IO.puts("Source: #{edge.source} (#{edge.source_handle})")
+      IO.puts("Target: #{edge.target} (#{edge.target_handle})")
+      IO.puts("Label: #{inspect(edge.label)}")
+      IO.puts("Metadata: #{inspect(edge.metadata)}")
+      IO.puts("========================\n")
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("select_edge", %{"id" => id, "multi" => multi}, socket) do
+    selected =
+      if multi == "true" do
+        # Multi-select: toggle the edge
+        if MapSet.member?(socket.assigns.selected_edge_ids, id) do
+          MapSet.delete(socket.assigns.selected_edge_ids, id)
+        else
+          MapSet.put(socket.assigns.selected_edge_ids, id)
+        end
+      else
+        # Single select: replace selection
+        MapSet.new([id])
+      end
+
+    {:noreply, assign(socket, :selected_edge_ids, selected)}
+  end
+
+  @impl true
   def handle_event("deselect_all", _params, socket) do
-    {:noreply, assign(socket, :selected_node_ids, MapSet.new())}
+    socket =
+      socket
+      |> assign(:selected_node_ids, MapSet.new())
+      |> assign(:selected_edge_ids, MapSet.new())
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -622,6 +684,7 @@ defmodule DemoWeb.HomeLive do
             nodes={@nodes}
             edges={@edges}
             selected_node_ids={@selected_node_ids}
+            selected_edge_ids={@selected_edge_ids}
           />
         </div>
 
@@ -952,12 +1015,24 @@ defmodule DemoWeb.HomeLive do
     graph = FlowGraph.new()
 
     {:ok, graph} =
-      FlowGraph.add_node(graph, "agent-1", :agent, %{position: %{x: 120, y: 120}})
+      FlowGraph.add_node(graph, "agent-1", :agent, %{
+        position: %{x: 120, y: 120},
+        label: "Data Processor",
+        metadata: %{status: "active", priority: "high"}
+      })
 
     {:ok, graph} =
-      FlowGraph.add_node(graph, "task-1", :task, %{position: %{x: 420, y: 260}})
+      FlowGraph.add_node(graph, "task-1", :task, %{
+        position: %{x: 420, y: 260},
+        label: "Analysis Task",
+        metadata: %{duration: 300, assigned_to: "worker-1"}
+      })
 
-    {:ok, graph} = FlowGraph.add_edge(graph, "edge-1", "agent-1", "out", "task-1", "in")
+    {:ok, graph} =
+      FlowGraph.add_edge(graph, "edge-1", "agent-1", "out", "task-1", "in", %{
+        label: "data flow",
+        metadata: %{bandwidth: "high", protocol: "streaming"}
+      })
 
     :ok = InMemory.save(@storage_id, graph)
     graph
@@ -968,6 +1043,8 @@ defmodule DemoWeb.HomeLive do
       %{
         id: node.id,
         title: title_for(node),
+        label: node.label,
+        metadata: node.metadata,
         x: node.position.x,
         y: node.position.y
       }
@@ -1000,6 +1077,13 @@ defmodule DemoWeb.HomeLive do
     |> Enum.reject(&is_nil/1)
   end
 
+  defp title_for(%{label: label, type: :agent, id: id}) when not is_nil(label),
+    do: "#{label} · #{id}"
+
+  defp title_for(%{label: label, type: :task, id: id}) when not is_nil(label),
+    do: "#{label} · #{id}"
+
+  defp title_for(%{label: label}) when not is_nil(label), do: label
   defp title_for(%{type: :agent, id: id}), do: "Agent · #{id}"
   defp title_for(%{type: :task, id: id}), do: "Task · #{id}"
   defp title_for(%{id: id}), do: id

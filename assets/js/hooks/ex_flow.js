@@ -35,17 +35,24 @@ export default {
       }
       
       const nodeEl = e.target.closest(".exflow-node")
-      
+
       // If clicking on a node, handle selection and/or drag
       if (nodeEl && this.el.contains(nodeEl)) {
         e.preventDefault()
 
         const id = nodeEl.dataset.id
+
+        // Check for Option/Alt + click for special action
+        if (e.altKey) {
+          this.pushEvent("option_click_node", { id })
+          return
+        }
+
         const isMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey
-        
+
         // Handle selection
         this.pushEvent("select_node", { id, multi: isMultiSelect.toString() })
-        
+
         const startX = e.clientX
         const startY = e.clientY
         const originX = parseFloat(nodeEl.dataset.x || "0")
@@ -53,7 +60,7 @@ export default {
 
         this.drag = { id, nodeEl, startX, startY, originX, originY }
         nodeEl.style.willChange = "transform" // Optimize rendering
-        
+
         // Start performance monitoring
         this.perfMonitor.dragStart = performance.now()
         this.perfMonitor.frameCount = 0
@@ -63,7 +70,25 @@ export default {
         window.addEventListener("mouseup", this.onMouseUp, { once: true })
         return
       }
-      
+
+      // Check for edge click
+      const edgeEl = e.target.closest(".exflow-edge")
+      if (edgeEl && this.el.contains(edgeEl)) {
+        e.preventDefault()
+        const edgeId = edgeEl.dataset.edgeId
+
+        // Check for Option/Alt + click on edge
+        if (e.altKey) {
+          this.pushEvent("option_click_edge", { id: edgeId })
+          return
+        }
+
+        // Regular edge click - select edge
+        const isMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey
+        this.pushEvent("select_edge", { id: edgeId, multi: isMultiSelect.toString() })
+        return
+      }
+
       // If clicking on canvas background, start pan
       if (e.target === this.el || e.target.classList.contains("exflow-canvas-bg")) {
         e.preventDefault()

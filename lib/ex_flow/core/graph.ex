@@ -3,10 +3,10 @@ defmodule ExFlow.Core.Graph do
   Immutable graph operations wrapping libgraph with ExFlow node/edge contracts.
 
   ## Node Schema
-  %{id: String.t(), type: atom(), position: %{x: number(), y: number()}, metadata: map()}
+  %{id: String.t(), type: atom(), label: String.t() | nil, position: %{x: number(), y: number()}, metadata: map()}
 
   ## Edge Schema
-  %{id: String.t(), source: String.t(), source_handle: String.t(), target: String.t(), target_handle: String.t()}
+  %{id: String.t(), source: String.t(), source_handle: String.t(), target: String.t(), target_handle: String.t(), label: String.t() | nil, metadata: map()}
   """
 
   alias Graph, as: LibGraph
@@ -14,6 +14,7 @@ defmodule ExFlow.Core.Graph do
   @type graph_node :: %{
           id: String.t(),
           type: atom(),
+          label: String.t() | nil,
           position: %{x: number(), y: number()},
           metadata: map()
         }
@@ -23,7 +24,9 @@ defmodule ExFlow.Core.Graph do
           source: String.t(),
           source_handle: String.t(),
           target: String.t(),
-          target_handle: String.t()
+          target_handle: String.t(),
+          label: String.t() | nil,
+          metadata: map()
         }
 
   @type t :: LibGraph.t()
@@ -36,11 +39,13 @@ defmodule ExFlow.Core.Graph do
   @spec add_node(t(), String.t(), atom(), map()) :: {:ok, t()} | {:error, term()}
   def add_node(%LibGraph{} = graph, id, type, metadata \\ %{}) when is_binary(id) do
     position = Map.get(metadata, :position, %{x: 0, y: 0})
+    label = Map.get(metadata, :label)
     node_metadata = Map.get(metadata, :metadata, %{})
 
     node = %{
       id: id,
       type: type,
+      label: label,
       position: position,
       metadata: node_metadata
     }
@@ -51,16 +56,29 @@ defmodule ExFlow.Core.Graph do
     end
   end
 
-  @spec add_edge(t(), String.t(), String.t(), String.t(), String.t(), String.t()) ::
+  @spec add_edge(t(), String.t(), String.t(), String.t(), String.t(), String.t(), map()) ::
           {:ok, t()} | {:error, term()}
-  def add_edge(%LibGraph{} = graph, id, source_id, source_handle, target_id, target_handle)
+  def add_edge(
+        %LibGraph{} = graph,
+        id,
+        source_id,
+        source_handle,
+        target_id,
+        target_handle,
+        opts \\ %{}
+      )
       when is_binary(id) and is_binary(source_id) and is_binary(target_id) do
+    edge_label = Map.get(opts, :label)
+    edge_metadata = Map.get(opts, :metadata, %{})
+
     edge_meta = %{
       id: id,
       source: source_id,
       source_handle: source_handle,
       target: target_id,
-      target_handle: target_handle
+      target_handle: target_handle,
+      label: edge_label,
+      metadata: edge_metadata
     }
 
     with :ok <- validate_edge(edge_meta),
