@@ -413,13 +413,17 @@ export default {
   createGhostEdge() {
     const svg = this.el.querySelector("svg")
     if (!svg) return
-    
+
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
     path.setAttribute("id", "ghost-edge")
-    path.setAttribute("class", "stroke-primary/50 stroke-2 fill-none pointer-events-none")
+    path.setAttribute("fill", "none")
+    path.setAttribute("stroke", "currentColor")
+    path.setAttribute("stroke-width", "2")
     path.setAttribute("stroke-dasharray", "5,5")
+    path.setAttribute("opacity", "0.5")
+    path.setAttribute("class", "pointer-events-none text-primary")
     svg.appendChild(path)
-    
+
     this.updateGhostEdge()
   },
   
