@@ -10,7 +10,13 @@ defmodule ExFlowGraph.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
-      description: "Interactive flow graph component library for Phoenix LiveView"
+      description: "Interactive flow graph component library for Phoenix LiveView",
+
+      # Docs
+      name: "ExFlowGraph",
+      source_url: "https://github.com/your-org/ex_flow_graph",
+      homepage_url: "https://github.com/your-org/ex_flow_graph",
+      docs: docs()
     ]
   end
 
@@ -38,15 +44,72 @@ defmodule ExFlowGraph.MixProject do
       {:phoenix_html, "~> 4.0"},
       {:libgraph, "~> 0.16"},
       {:jason, "~> 1.2"},
-      {:gettext, "~> 0.26"}
+      {:gettext, "~> 0.26"},
+            {:ex_doc, "~> 0.40", only: :dev, runtime: false}
     ]
   end
 
   defp package do
     [
-      files: ~w(lib priv assets .formatter.exs mix.exs README* LICENSE*),
+      files: ~w(lib priv assets .formatter.exs mix.exs README* INSTALLATION.md guides),
       licenses: ["MIT"],
       links: %{}
     ]
   end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: [
+        "README.md",
+        "INSTALLATION.md",
+        "guides/getting-started.md",
+        "guides/events-and-callbacks.md",
+        "guides/labels-and-metadata.md",
+        "guides/option-click-events.md",
+        "guides/undo-redo.md",
+        "guides/customization.md"
+      ],
+      groups_for_extras: [
+        "Getting Started": ~r/(README|INSTALLATION|guides\/getting-started)/,
+        "Reference": ~r/guides\/events-and-callbacks/,
+        "Features": ~r/guides\/(labels-and-metadata|option-click-events|undo-redo)/,
+        "Advanced": ~r/guides\/customization/
+      ],
+      groups_for_modules: [
+        "Core": [
+          ExFlow.Core.Graph,
+          ExFlow.HistoryManager
+        ],
+        "Commands": [
+          ExFlow.Command,
+          ExFlow.Commands.CreateNodeCommand,
+          ExFlow.Commands.CreateEdgeCommand,
+          ExFlow.Commands.DeleteNodeCommand,
+          ExFlow.Commands.DeleteEdgeCommand,
+          ExFlow.Commands.MoveNodeCommand
+        ],
+        "Storage": [
+          ExFlow.Storage,
+          ExFlow.Storage.InMemory
+        ],
+        "Components": [
+          ExFlowGraphWeb.ExFlow.Canvas,
+          ExFlowGraphWeb.ExFlow.Node,
+          ExFlowGraphWeb.ExFlow.Edge
+        ]
+      ],
+      before_closing_body_tag: &before_closing_body_tag/1
+    ]
+  end
+
+  defp before_closing_body_tag(:html) do
+    """
+    <script>
+      // Add any custom JavaScript for docs here
+    </script>
+    """
+  end
+
+  defp before_closing_body_tag(_), do: ""
 end
