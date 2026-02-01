@@ -1,5 +1,5 @@
-defmodule ExFlowGraphWeb.HomeLive do
-  use ExFlowGraphWeb, :live_view
+defmodule DemoWeb.HomeLive do
+  use DemoWeb, :live_view
 
   alias ExFlow.Core.Graph, as: FlowGraph
   alias ExFlow.Storage.InMemory
@@ -662,7 +662,7 @@ defmodule ExFlowGraphWeb.HomeLive do
         <%!-- Comprehensive Feature Guide --%>
         <div class="mt-6 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-sm">
           <h2 class="text-2xl font-bold mb-6">Feature Guide & Documentation</h2>
-          
+
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <%!-- Canvas Controls --%>
             <div>
@@ -752,7 +752,7 @@ defmodule ExFlowGraphWeb.HomeLive do
                 <div class="pl-4 border-l-2 border-warning/30">
                   <h4 class="font-medium mb-1">Undo/Redo Operations</h4>
                   <p class="text-sm text-base-content/70">
-                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Z</kbd> Undo last action • 
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Z</kbd> Undo last action •
                     <kbd class="kbd kbd-xs">Cmd/Ctrl+Shift+Z</kbd> Redo undone action
                   </p>
                 </div>
@@ -783,8 +783,8 @@ defmodule ExFlowGraphWeb.HomeLive do
                 <div class="pl-4 border-l-2 border-success/30">
                   <h4 class="font-medium mb-1">Keyboard Shortcuts</h4>
                   <p class="text-sm text-base-content/70">
-                    <kbd class="kbd kbd-xs">Cmd/Ctrl+A</kbd> Select all • 
-                    <kbd class="kbd kbd-xs">Escape</kbd> Clear selection • 
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+A</kbd> Select all •
+                    <kbd class="kbd kbd-xs">Escape</kbd> Clear selection •
                     <kbd class="kbd kbd-xs">Delete</kbd> Delete selected
                   </p>
                 </div>

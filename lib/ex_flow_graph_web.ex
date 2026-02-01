@@ -89,7 +89,6 @@ defmodule ExFlowGraphWeb do
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS
-      alias ExFlowGraphWeb.Layouts
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())
@@ -98,10 +97,8 @@ defmodule ExFlowGraphWeb do
 
   def verified_routes do
     quote do
-      use Phoenix.VerifiedRoutes,
-        endpoint: ExFlowGraphWeb.Endpoint,
-        router: ExFlowGraphWeb.Router,
-        statics: ExFlowGraphWeb.static_paths()
+      # Library components don't need verified routes
+      # Routes are handled by the host application
     end
   end
 

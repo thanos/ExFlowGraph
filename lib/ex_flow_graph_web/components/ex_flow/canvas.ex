@@ -11,7 +11,8 @@ defmodule ExFlowGraphWeb.ExFlow.Canvas do
     <div
       id={@id}
       phx-hook="ExFlowCanvas"
-      class="relative h-[70vh] w-full overflow-hidden rounded-2xl border border-base-300 bg-gradient-to-br from-base-200/40 to-base-100 exflow-canvas-bg"
+      style="height: 70vh;"
+      class="relative w-full overflow-hidden rounded-2xl border border-base-300 bg-gradient-to-br from-base-200/40 to-base-100 exflow-canvas-bg"
       data-selected-ids={Jason.encode!(MapSet.to_list(@selected_node_ids))}
     >
       <div class="exflow-container absolute inset-0">

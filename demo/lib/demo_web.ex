@@ -87,6 +87,11 @@ defmodule DemoWeb do
       # Core UI components
       import DemoWeb.CoreComponents
 
+      # Import ExFlowGraph components
+      import ExFlowGraphWeb.ExFlow.Canvas
+      import ExFlowGraphWeb.ExFlow.Node
+      import ExFlowGraphWeb.ExFlow.Edge
+
       # Common modules used in templates
       alias Phoenix.LiveView.JS
       alias DemoWeb.Layouts

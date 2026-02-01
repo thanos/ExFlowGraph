@@ -5,6 +5,7 @@
 @source "../css";
 @source "../js";
 @source "../../lib/demo_web";
+@source "../../lib/ex_flow_graph_web/**/*.{ex,exs,heex}";
 
 /* A Tailwind plugin that makes "hero-#{ICON}" classes available.
    The heroicons installation itself is managed by your mix.exs */
