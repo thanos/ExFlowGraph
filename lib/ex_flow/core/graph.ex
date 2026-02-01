@@ -124,6 +124,68 @@ defmodule ExFlow.Core.Graph do
     end
   end
 
+  @spec update_node(t(), String.t(), map()) :: {:ok, t()} | {:error, term()}
+  def update_node(%LibGraph{} = graph, id, updates) when is_binary(id) and is_map(updates) do
+    case LibGraph.vertex_labels(graph, id) do
+      [node] when is_map(node) ->
+        # Store all edges connected to this node before deleting
+        in_edges = LibGraph.in_edges(graph, id)
+        out_edges = LibGraph.out_edges(graph, id)
+
+        # Update the node with provided changes
+        updated_node =
+          node
+          |> maybe_update(:label, updates[:label])
+          |> maybe_update(:metadata, updates[:metadata])
+
+        graph = LibGraph.delete_vertex(graph, id)
+        graph = LibGraph.add_vertex(graph, id, [updated_node])
+
+        # Restore all edges
+        graph =
+          Enum.reduce(in_edges, graph, fn edge, g ->
+            LibGraph.add_edge(g, edge.v1, id, label: edge.label)
+          end)
+
+        graph =
+          Enum.reduce(out_edges, graph, fn edge, g ->
+            LibGraph.add_edge(g, id, edge.v2, label: edge.label)
+          end)
+
+        {:ok, graph}
+
+      _ ->
+        {:error, :node_not_found}
+    end
+  end
+
+  @spec update_edge(t(), String.t(), map()) :: {:ok, t()} | {:error, term()}
+  def update_edge(%LibGraph{} = graph, id, updates) when is_binary(id) and is_map(updates) do
+    # Find the edge
+    edge =
+      get_edges(graph)
+      |> Enum.find(&(&1.id == id))
+
+    case edge do
+      nil ->
+        {:error, :edge_not_found}
+
+      edge ->
+        # Update edge metadata
+        updated_edge =
+          edge
+          |> maybe_update(:label, updates[:label])
+          |> maybe_update(:metadata, updates[:metadata])
+
+        # Remove old edge and add updated one
+        graph = LibGraph.delete_edge(graph, edge.source, edge.target)
+        {:ok, LibGraph.add_edge(graph, edge.source, edge.target, label: updated_edge)}
+    end
+  end
+
+  defp maybe_update(map, _key, nil), do: map
+  defp maybe_update(map, key, value), do: Map.put(map, key, value)
+
   @spec delete_node(t(), String.t()) :: {:ok, t()} | {:error, term()}
   def delete_node(%LibGraph{} = graph, id) when is_binary(id) do
     if LibGraph.has_vertex?(graph, id) do

@@ -25,6 +25,12 @@ defmodule DemoWeb.Components.TailwindSafelist do
       <svg class="absolute inset-0 z-0 h-full w-full pointer-events-none"></svg>
       <div class="absolute inset-0 z-10 pointer-events-none"></div>
       <path style="cursor: pointer;"></path>
+
+      <!-- Modal and form classes -->
+      <div class="modal modal-open modal-box max-w-2xl form-control label label-text label-text-alt textarea textarea-bordered h-48 bg-base-200 modal-action modal-backdrop font-mono font-semibold"></div>
+      <button class="btn btn-ghost btn-primary"></button>
+      <input class="input input-bordered" />
+      <textarea class="textarea textarea-bordered"></textarea>
     </div>
     """
   end

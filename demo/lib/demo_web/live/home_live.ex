@@ -30,6 +30,11 @@ defmodule DemoWeb.HomeLive do
       |> assign(:show_help, false)
       |> assign(:selected_node_ids, MapSet.new())
       |> assign(:selected_edge_ids, MapSet.new())
+      |> assign(:show_edit_modal, false)
+      |> assign(:editing_type, nil)
+      |> assign(:editing_item, nil)
+      |> assign(:edit_label, "")
+      |> assign(:edit_metadata, "")
       |> assign(:history, ExFlow.HistoryManager.new())
 
     {:ok, socket}
@@ -246,40 +251,75 @@ defmodule DemoWeb.HomeLive do
 
   @impl true
   def handle_event("option_click_node", %{"id" => id}, socket) do
-    # Option/Alt + click on node - show node details
-    node = FlowGraph.get_nodes(socket.assigns.graph)
-           |> Enum.find(&(&1.id == id))
+    # Option/Alt + click on node - show edit modal
+    node =
+      FlowGraph.get_nodes(socket.assigns.graph)
+      |> Enum.find(&(&1.id == id))
 
     if node do
-      IO.puts("\n=== Option+Click Node ===")
-      IO.puts("ID: #{node.id}")
-      IO.puts("Type: #{node.type}")
-      IO.puts("Label: #{inspect(node.label)}")
-      IO.puts("Position: #{inspect(node.position)}")
-      IO.puts("Metadata: #{inspect(node.metadata)}")
-      IO.puts("========================\n")
+      metadata_json = Jason.encode!(node.metadata, pretty: true)
+
+      socket =
+        socket
+        |> assign(:show_edit_modal, true)
+        |> assign(:editing_type, :node)
+        |> assign(:editing_item, node)
+        |> assign(:edit_label, node.label || "")
+        |> assign(:edit_metadata, metadata_json)
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_event("option_click_edge", %{"id" => id}, socket) do
+    # Option/Alt + click on edge - show edit modal
+    edge =
+      FlowGraph.get_edges(socket.assigns.graph)
+      |> Enum.find(&(&1.id == id))
+
+    if edge do
+      metadata_json = Jason.encode!(edge.metadata, pretty: true)
+
+      socket =
+        socket
+        |> assign(:show_edit_modal, true)
+        |> assign(:editing_type, :edge)
+        |> assign(:editing_item, edge)
+        |> assign(:edit_label, edge.label || "")
+        |> assign(:edit_metadata, metadata_json)
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("close_edit_modal", _params, socket) do
+    socket =
+      socket
+      |> assign(:show_edit_modal, false)
+      |> assign(:editing_type, nil)
+      |> assign(:editing_item, nil)
+      |> assign(:edit_label, "")
+      |> assign(:edit_metadata, "")
 
     {:noreply, socket}
   end
 
   @impl true
-  def handle_event("option_click_edge", %{"id" => id}, socket) do
-    # Option/Alt + click on edge - show edge details
-    edge = FlowGraph.get_edges(socket.assigns.graph)
-           |> Enum.find(&(&1.id == id))
+  def handle_event("save_edit", params, socket) do
+    label = params["label"] || ""
+    metadata = params["metadata"] || "{}"
 
-    if edge do
-      IO.puts("\n=== Option+Click Edge ===")
-      IO.puts("ID: #{edge.id}")
-      IO.puts("Source: #{edge.source} (#{edge.source_handle})")
-      IO.puts("Target: #{edge.target} (#{edge.target_handle})")
-      IO.puts("Label: #{inspect(edge.label)}")
-      IO.puts("Metadata: #{inspect(edge.metadata)}")
-      IO.puts("========================\n")
+    case socket.assigns.editing_type do
+      :node -> save_node_edit(socket, label, metadata)
+      :edge -> save_edge_edit(socket, label, metadata)
+      _ -> {:noreply, socket}
     end
-
-    {:noreply, socket}
   end
 
   @impl true
@@ -1007,8 +1047,150 @@ defmodule DemoWeb.HomeLive do
           <div class="modal-backdrop" phx-click="toggle_load_modal"></div>
         </div>
       <% end %>
+
+      <%!-- Edit Modal --%>
+      <%= if @show_edit_modal do %>
+        <div class="modal modal-open">
+          <div class="modal-box max-w-2xl">
+            <h3 class="text-lg font-bold mb-4">
+              Edit <%= if @editing_type == :node, do: "Node", else: "Edge" %>
+              · <%= @editing_item.id %>
+            </h3>
+
+            <form phx-submit="save_edit">
+              <%!-- Label Input --%>
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text font-medium">Label</span>
+                </label>
+                <input
+                  type="text"
+                  class="input input-bordered w-full"
+                  value={@edit_label}
+                  name="label"
+                  placeholder="Optional display label"
+                />
+              </div>
+
+              <%!-- Metadata Input --%>
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text font-medium">Metadata (JSON)</span>
+                </label>
+                <textarea
+                  class="textarea textarea-bordered w-full h-48 font-mono text-sm"
+                  name="metadata"
+                  placeholder="{}"
+                ><%= @edit_metadata %></textarea>
+                <label class="label">
+                  <span class="label-text-alt">Enter valid JSON object</span>
+                </label>
+              </div>
+
+              <%!-- Info Display --%>
+              <div class="bg-base-200 rounded-lg p-4 mb-4">
+                <div class="text-sm space-y-1">
+                  <div>
+                    <span class="font-semibold">ID:</span>
+                    <span class="font-mono"><%= @editing_item.id %></span>
+                  </div>
+                  <%= if @editing_type == :node do %>
+                    <div>
+                      <span class="font-semibold">Type:</span>
+                      <span><%= @editing_item.type %></span>
+                    </div>
+                    <div>
+                      <span class="font-semibold">Position:</span>
+                      <span>
+                        x: <%= @editing_item.position.x %>, y: <%= @editing_item.position.y %>
+                      </span>
+                    </div>
+                  <% else %>
+                    <div>
+                      <span class="font-semibold">Connection:</span>
+                      <span>
+                        <%= @editing_item.source %> → <%= @editing_item.target %>
+                      </span>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="modal-action">
+                <button type="button" phx-click="close_edit_modal" class="btn btn-ghost">
+                  Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+              </div>
+            </form>
+          </div>
+          <div class="modal-backdrop" phx-click="close_edit_modal"></div>
+        </div>
+      <% end %>
     </div>
     """
+  end
+
+  defp save_node_edit(socket, label_input, metadata_input) do
+    node = socket.assigns.editing_item
+    label = if label_input == "", do: nil, else: label_input
+
+    metadata =
+      case Jason.decode(metadata_input) do
+        {:ok, meta} -> meta
+        {:error, _} -> node.metadata
+      end
+
+    case FlowGraph.update_node(socket.assigns.graph, node.id, %{
+           label: label,
+           metadata: metadata
+         }) do
+      {:ok, graph} ->
+        :ok = InMemory.save(@storage_id, graph)
+
+        socket =
+          socket
+          |> assign(:graph, graph)
+          |> assign(:show_edit_modal, false)
+          |> assign(:editing_type, nil)
+          |> assign(:editing_item, nil)
+
+        {:noreply, socket}
+
+      {:error, _reason} ->
+        {:noreply, socket}
+    end
+  end
+
+  defp save_edge_edit(socket, label_input, metadata_input) do
+    edge = socket.assigns.editing_item
+    label = if label_input == "", do: nil, else: label_input
+
+    metadata =
+      case Jason.decode(metadata_input) do
+        {:ok, meta} -> meta
+        {:error, _} -> edge.metadata
+      end
+
+    case FlowGraph.update_edge(socket.assigns.graph, edge.id, %{
+           label: label,
+           metadata: metadata
+         }) do
+      {:ok, graph} ->
+        :ok = InMemory.save(@storage_id, graph)
+
+        socket =
+          socket
+          |> assign(:graph, graph)
+          |> assign(:show_edit_modal, false)
+          |> assign(:editing_type, nil)
+          |> assign(:editing_item, nil)
+
+        {:noreply, socket}
+
+      {:error, _reason} ->
+        {:noreply, socket}
+    end
   end
 
   defp create_demo_graph do
