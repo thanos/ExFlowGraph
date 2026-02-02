@@ -65,8 +65,6 @@ defmodule Demo.MixProject do
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       {:quokka, "~> 2.11", only: [:dev, :test], runtime: false},
       {:lazy_html, "~> 0.1.8", only: :test},
-      {:phoenix_test, "~> 0.9.1", only: :test, runtime: false},
-      {:phoenix_test_playwright, "~> 0.10.1", only: :test, runtime: false},
       {:live_debugger, "~> 0.5.1", only: :dev}
     ]
   end
