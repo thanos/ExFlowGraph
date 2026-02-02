@@ -1,6 +1,9 @@
 defmodule DemoWeb.HomeLive do
   use DemoWeb, :live_view
 
+  alias ExFlow.Commands.CreateEdgeCommand
+  alias ExFlow.Commands.CreateNodeCommand
+  alias ExFlow.Commands.DeleteNodeCommand
   alias ExFlow.Core.Graph, as: FlowGraph
   alias ExFlow.Storage.InMemory
 
@@ -66,7 +69,7 @@ defmodule DemoWeb.HomeLive do
     edge_id = "edge-#{System.unique_integer([:positive])}"
 
     command =
-      ExFlow.Commands.CreateEdgeCommand.new(
+      CreateEdgeCommand.new(
         edge_id,
         source_id,
         source_handle,
@@ -94,7 +97,7 @@ defmodule DemoWeb.HomeLive do
     y = :rand.uniform(300) + 50
 
     command =
-      ExFlow.Commands.CreateNodeCommand.new(node_id, node_type, %{position: %{x: x, y: y}})
+      CreateNodeCommand.new(node_id, node_type, %{position: %{x: x, y: y}})
 
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
@@ -108,7 +111,7 @@ defmodule DemoWeb.HomeLive do
 
   @impl true
   def handle_event("delete_node", %{"id" => id}, socket) do
-    command = ExFlow.Commands.DeleteNodeCommand.new(id, socket.assigns.graph)
+    command = DeleteNodeCommand.new(id, socket.assigns.graph)
 
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
@@ -367,10 +370,9 @@ defmodule DemoWeb.HomeLive do
     # Delete each node using commands so they can be undone
     result =
       Enum.reduce_while(selected_ids, {:ok, socket.assigns.history, socket.assigns.graph}, fn id,
-                                                                                              {:ok,
-                                                                                               acc_history,
+                                                                                              {:ok, acc_history,
                                                                                                acc_graph} ->
-        command = ExFlow.Commands.DeleteNodeCommand.new(id, acc_graph)
+        command = DeleteNodeCommand.new(id, acc_graph)
 
         case ExFlow.HistoryManager.execute(acc_history, command, acc_graph) do
           {:ok, new_history, new_graph} -> {:cont, {:ok, new_history, new_graph}}
@@ -1378,11 +1380,9 @@ defmodule DemoWeb.HomeLive do
     |> Enum.reject(&is_nil/1)
   end
 
-  defp title_for(%{label: label, type: :agent, id: id}) when not is_nil(label),
-    do: "#{label} · #{id}"
+  defp title_for(%{label: label, type: :agent, id: id}) when not is_nil(label), do: "#{label} · #{id}"
 
-  defp title_for(%{label: label, type: :task, id: id}) when not is_nil(label),
-    do: "#{label} · #{id}"
+  defp title_for(%{label: label, type: :task, id: id}) when not is_nil(label), do: "#{label} · #{id}"
 
   defp title_for(%{label: label}) when not is_nil(label), do: label
   defp title_for(%{type: :agent, id: id}), do: "Agent · #{id}"

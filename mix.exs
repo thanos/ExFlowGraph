@@ -1,11 +1,21 @@
 defmodule ExFlowGraph.MixProject do
   use Mix.Project
 
+  alias ExFlow.Commands.CreateEdgeCommand
+  alias ExFlow.Commands.CreateNodeCommand
+  alias ExFlow.Commands.DeleteEdgeCommand
+  alias ExFlow.Commands.DeleteNodeCommand
+  alias ExFlow.Commands.MoveNodeCommand
+  alias ExFlow.Core.Graph
+  alias ExFlow.Storage.InMemory
+  alias ExFlowGraphWeb.ExFlow.Canvas
+  alias ExFlowGraphWeb.ExFlow.Edge
+
   def project do
     [
       app: :ex_flow_graph,
       version: "0.1.0",
-      elixir: "~> 1.15",
+      elixir: "~> 1.16",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -16,7 +26,24 @@ defmodule ExFlowGraph.MixProject do
       name: "ExFlowGraph",
       source_url: "https://github.com/your-org/ex_flow_graph",
       homepage_url: "https://github.com/your-org/ex_flow_graph",
-      docs: docs()
+      docs: docs(),
+
+      # Test coverage
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test
+      ],
+
+      # Dialyzer
+      dialyzer: [
+        plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+        plt_add_apps: [:ex_unit, :mix],
+        flags: [:error_handling, :underspecs, :unmatched_returns]
+      ]
     ]
   end
 
@@ -44,8 +71,15 @@ defmodule ExFlowGraph.MixProject do
       {:phoenix_html, "~> 4.0"},
       {:libgraph, "~> 0.16"},
       {:jason, "~> 1.2"},
-      {:gettext, "~> 0.26"},
-            {:ex_doc, "~> 0.40", only: :dev, runtime: false}
+      {:gettext, "~> 1.0.2"},
+      # for dev
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.14.1", only: [:dev, :test]},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      {:quokka, "~> 2.11", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -72,31 +106,31 @@ defmodule ExFlowGraph.MixProject do
       ],
       groups_for_extras: [
         "Getting Started": ~r/(README|INSTALLATION|guides\/getting-started)/,
-        "Reference": ~r/guides\/events-and-callbacks/,
-        "Features": ~r/guides\/(labels-and-metadata|option-click-events|undo-redo)/,
-        "Advanced": ~r/guides\/customization/
+        Reference: ~r/guides\/events-and-callbacks/,
+        Features: ~r/guides\/(labels-and-metadata|option-click-events|undo-redo)/,
+        Advanced: ~r/guides\/customization/
       ],
       groups_for_modules: [
-        "Core": [
-          ExFlow.Core.Graph,
+        Core: [
+          Graph,
           ExFlow.HistoryManager
         ],
-        "Commands": [
+        Commands: [
           ExFlow.Command,
-          ExFlow.Commands.CreateNodeCommand,
-          ExFlow.Commands.CreateEdgeCommand,
-          ExFlow.Commands.DeleteNodeCommand,
-          ExFlow.Commands.DeleteEdgeCommand,
-          ExFlow.Commands.MoveNodeCommand
+          CreateNodeCommand,
+          CreateEdgeCommand,
+          DeleteNodeCommand,
+          DeleteEdgeCommand,
+          MoveNodeCommand
         ],
-        "Storage": [
+        Storage: [
           ExFlow.Storage,
-          ExFlow.Storage.InMemory
+          InMemory
         ],
-        "Components": [
-          ExFlowGraphWeb.ExFlow.Canvas,
+        Components: [
+          Canvas,
           ExFlowGraphWeb.ExFlow.Node,
-          ExFlowGraphWeb.ExFlow.Edge
+          Edge
         ]
       ],
       before_closing_body_tag: &before_closing_body_tag/1

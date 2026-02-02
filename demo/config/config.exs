@@ -14,7 +14,9 @@ import Config
 #
 # For production it's recommended to configure a different adapter
 # at the `config/runtime.exs`.
-config :demo, Demo.Mailer, adapter: Swoosh.Adapters.Local
+alias Swoosh.Adapters.Local
+
+config :demo, Demo.Mailer, adapter: Local
 
 # Configures the endpoint
 config :demo, DemoWeb.Endpoint,

@@ -7,7 +7,9 @@ import Config
 # In test we don't send emails
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
-config :demo, Demo.Mailer, adapter: Swoosh.Adapters.Test
+alias Swoosh.Adapters.Test
+
+config :demo, Demo.Mailer, adapter: Test
 
 config :demo, Demo.Repo,
   username: "postgres",

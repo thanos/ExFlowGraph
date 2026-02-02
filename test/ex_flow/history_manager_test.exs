@@ -1,7 +1,7 @@
 defmodule ExFlow.HistoryManagerTest do
   use ExUnit.Case, async: true
 
-  alias ExFlow.Commands.{CreateNodeCommand, DeleteNodeCommand, MoveNodeCommand}
+  alias ExFlow.Commands.{CreateNodeCommand, DeleteNodeCommand}
   alias ExFlow.Core.Graph
   alias ExFlow.HistoryManager
 
@@ -306,7 +306,7 @@ defmodule ExFlow.HistoryManagerTest do
       assert {:ok, _} = Graph.get_node(graph, "node-1")
 
       # Undo again
-      {:ok, history, graph} = HistoryManager.undo(history, graph)
+      {:ok, _history, graph} = HistoryManager.undo(history, graph)
       assert {:error, :node_not_found} = Graph.get_node(graph, "node-1")
     end
 

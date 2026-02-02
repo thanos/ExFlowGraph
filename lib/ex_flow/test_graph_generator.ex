@@ -7,7 +7,7 @@ defmodule ExFlow.TestGraphGenerator do
 
   @doc """
   Generates a graph with the specified number of nodes and edges.
-  
+
   ## Options
   - `:node_count` - Number of nodes to generate (default: 100)
   - `:edge_density` - Average edges per node (default: 2.0)
@@ -75,6 +75,7 @@ defmodule ExFlow.TestGraphGenerator do
 
     for i <- 0..(count - 1) do
       angle = 2 * :math.pi() * i / count
+
       %{
         x: round(center_x + radius * :math.cos(angle)),
         y: round(center_y + radius * :math.sin(angle))
@@ -91,15 +92,15 @@ defmodule ExFlow.TestGraphGenerator do
       target = Enum.random(node_ids)
 
       # Don't create self-loops
-      if source != target do
+      if source == target do
+        acc_graph
+      else
         edge_id = "edge-#{i}"
 
         case FlowGraph.add_edge(acc_graph, edge_id, source, "out", target, "in") do
           {:ok, new_graph} -> new_graph
           {:error, _} -> acc_graph
         end
-      else
-        acc_graph
       end
     end)
   end

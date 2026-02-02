@@ -1,11 +1,11 @@
 defmodule ExFlow.HistoryManager do
   @moduledoc """
   Manages undo/redo history using a command stack.
-  
+
   Maintains two stacks:
   - past: commands that have been executed
   - future: commands that have been undone
-  
+
   When a new command is executed, the future stack is cleared.
   """
 

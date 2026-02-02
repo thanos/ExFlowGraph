@@ -46,6 +46,7 @@ defmodule ExFlow.Serializer do
     %{
       id: node["id"] || node[:id],
       type: atomize(node["type"] || node[:type]),
+      label: node["label"] || node[:label],
       position: normalize_position(node["position"] || node[:position]),
       metadata: node["metadata"] || node[:metadata] || %{}
     }
@@ -57,7 +58,9 @@ defmodule ExFlow.Serializer do
       source: edge["source"] || edge[:source],
       source_handle: edge["source_handle"] || edge[:source_handle],
       target: edge["target"] || edge[:target],
-      target_handle: edge["target_handle"] || edge[:target_handle]
+      target_handle: edge["target_handle"] || edge[:target_handle],
+      label: edge["label"] || edge[:label],
+      metadata: edge["metadata"] || edge[:metadata] || %{}
     }
   end
 

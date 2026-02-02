@@ -35,14 +35,18 @@ defmodule ExFlow.Commands.DeleteEdgeCommand do
 
   @impl ExFlow.Command
   def undo(%__MODULE__{} = cmd, graph) do
-    Graph.add_edge(
-      graph,
-      cmd.edge_id,
-      cmd.edge_data.source,
-      cmd.edge_data.source_handle,
-      cmd.edge_data.target,
-      cmd.edge_data.target_handle
-    )
+    if cmd.edge_data == nil do
+      {:error, :no_edge_data}
+    else
+      Graph.add_edge(
+        graph,
+        cmd.edge_id,
+        cmd.edge_data.source,
+        cmd.edge_data.source_handle,
+        cmd.edge_data.target,
+        cmd.edge_data.target_handle
+      )
+    end
   end
 
   @impl ExFlow.Command
