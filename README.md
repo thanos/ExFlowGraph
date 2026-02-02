@@ -7,6 +7,16 @@ Build powerful, interactive workflow editors and visual node-based interfaces in
 ![Phoenix](https://img.shields.io/badge/Phoenix-1.8+-orange.svg)
 ![LiveView](https://img.shields.io/badge/LiveView-1.0+-purple.svg)
 ![Elixir](https://img.shields.io/badge/Elixir-1.16+-purple.svg)
+[![Hex.pm](https://img.shields.io/hexpm/v/ex_zarr.svg)](https://hex.pm/packages/ex_flow_graph)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/ex_flow_graph)
+[![Hex.pm Downloads](https://img.shields.io/hexpm/dt/ex_zarr.svg)](https://hex.pm/packages/ex_flow_graph)
+[![License](https://img.shields.io/hexpm/l/ex_zarr.svg)](https://github.com/thanos/ex_flow_graph/blob/main/LICENSE)
+[![Build Status](https://github.com/thanos/ExZarr/workflows/CI/badge.svg)](https://github.com/thanos/ex_flow_graph/actions)
+[![Coverage Status](https://coveralls.io/repos/github/thanos/ex_flow_graph/badge.svg?branch=main)](https://coveralls.io/github/thanos/ex_flow_graph?branch=main)
+
+
+<img width="495" height="240" alt="Screenshot 2026-02-01 at 22 15 47" src="https://github.com/user-attachments/assets/c1472d3e-a38d-4609-ab43-645a0a44bcea" />
+
 
 ---
 
