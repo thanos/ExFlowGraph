@@ -244,6 +244,13 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      - name: Compile parent library
+        run: |
+          cd ..
+          mix deps.get
+          mix compile
+          cd demo
+
       - name: Compile
         run: mix compile --warnings-as-errors
 
