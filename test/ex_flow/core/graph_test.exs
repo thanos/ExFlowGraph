@@ -290,6 +290,137 @@ defmodule ExFlow.Core.GraphTest do
     end
   end
 
+  describe "update_node/3" do
+    test "updates node label" do
+      graph = Graph.new()
+      {:ok, graph} = Graph.add_node(graph, "node-1", :agent, %{position: %{x: 0, y: 0}})
+
+      {:ok, graph} = Graph.update_node(graph, "node-1", %{label: "New Label"})
+
+      {:ok, node} = Graph.get_node(graph, "node-1")
+      assert node.label == "New Label"
+    end
+
+    test "updates node metadata" do
+      graph = Graph.new()
+
+      {:ok, graph} =
+        Graph.add_node(graph, "node-1", :agent, %{
+          position: %{x: 0, y: 0},
+          metadata: %{color: "red"}
+        })
+
+      {:ok, graph} =
+        Graph.update_node(graph, "node-1", %{metadata: %{color: "blue", size: "large"}})
+
+      {:ok, node} = Graph.get_node(graph, "node-1")
+      assert node.metadata == %{color: "blue", size: "large"}
+    end
+
+    test "updates both label and metadata" do
+      graph = Graph.new()
+      {:ok, graph} = Graph.add_node(graph, "node-1", :agent, %{position: %{x: 0, y: 0}})
+
+      {:ok, graph} =
+        Graph.update_node(graph, "node-1", %{label: "Updated", metadata: %{status: "active"}})
+
+      {:ok, node} = Graph.get_node(graph, "node-1")
+      assert node.label == "Updated"
+      assert node.metadata == %{status: "active"}
+    end
+
+    test "preserves other node properties" do
+      graph = Graph.new()
+      {:ok, graph} = Graph.add_node(graph, "node-1", :agent, %{position: %{x: 100, y: 200}})
+
+      {:ok, graph} = Graph.update_node(graph, "node-1", %{label: "Test"})
+
+      {:ok, node} = Graph.get_node(graph, "node-1")
+      assert node.type == :agent
+      assert node.position == %{x: 100, y: 200}
+    end
+
+    test "can set label to nil" do
+      graph = Graph.new()
+
+      {:ok, graph} =
+        Graph.add_node(graph, "node-1", :agent, %{position: %{x: 0, y: 0}, label: "Original"})
+
+      {:ok, graph} = Graph.update_node(graph, "node-1", %{label: nil})
+
+      {:ok, node} = Graph.get_node(graph, "node-1")
+      assert node.label == nil
+    end
+
+    test "returns error for nonexistent node" do
+      graph = Graph.new()
+      result = Graph.update_node(graph, "nonexistent", %{label: "Test"})
+      assert result == {:error, :node_not_found}
+    end
+  end
+
+  describe "update_edge/3" do
+    setup do
+      graph = Graph.new()
+      {:ok, graph} = Graph.add_node(graph, "node-1", :agent, %{position: %{x: 0, y: 0}})
+      {:ok, graph} = Graph.add_node(graph, "node-2", :task, %{position: %{x: 100, y: 100}})
+      {:ok, graph} = Graph.add_edge(graph, "edge-1", "node-1", "out", "node-2", "in")
+      %{graph: graph}
+    end
+
+    test "updates edge label", %{graph: graph} do
+      {:ok, graph} = Graph.update_edge(graph, "edge-1", %{label: "New Label"})
+
+      edges = Graph.get_edges(graph)
+      edge = hd(edges)
+      assert edge.label == "New Label"
+    end
+
+    test "updates edge metadata", %{graph: graph} do
+      {:ok, graph} =
+        Graph.update_edge(graph, "edge-1", %{metadata: %{bandwidth: "high", protocol: "http"}})
+
+      edges = Graph.get_edges(graph)
+      edge = hd(edges)
+      assert edge.metadata == %{bandwidth: "high", protocol: "http"}
+    end
+
+    test "updates both label and metadata", %{graph: graph} do
+      {:ok, graph} =
+        Graph.update_edge(graph, "edge-1", %{label: "Connection", metadata: %{type: "data"}})
+
+      edges = Graph.get_edges(graph)
+      edge = hd(edges)
+      assert edge.label == "Connection"
+      assert edge.metadata == %{type: "data"}
+    end
+
+    test "preserves other edge properties", %{graph: graph} do
+      {:ok, graph} = Graph.update_edge(graph, "edge-1", %{label: "Test"})
+
+      edges = Graph.get_edges(graph)
+      edge = hd(edges)
+      assert edge.source == "node-1"
+      assert edge.target == "node-2"
+      assert edge.source_handle == "out"
+      assert edge.target_handle == "in"
+    end
+
+    test "can set label to nil", %{graph: graph} do
+      {:ok, graph} = Graph.update_edge(graph, "edge-1", %{label: "Original"})
+      {:ok, graph} = Graph.update_edge(graph, "edge-1", %{label: nil})
+
+      edges = Graph.get_edges(graph)
+      edge = hd(edges)
+      assert edge.label == nil
+    end
+
+    test "returns error for nonexistent edge", %{graph: graph} do
+      result = Graph.update_edge(graph, "nonexistent", %{label: "Test"})
+      assert result == {:error, :edge_not_found}
+    end
+  end
+
   describe "immutability" do
     test "operations return new graph without mutating original" do
       graph1 = Graph.new()

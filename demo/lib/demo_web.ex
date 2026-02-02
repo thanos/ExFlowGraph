@@ -23,10 +23,11 @@ defmodule DemoWeb do
     quote do
       use Phoenix.Router, helpers: false
 
-      # Import common connection and controller functions to use in pipelines
-      import Plug.Conn
       import Phoenix.Controller
       import Phoenix.LiveView.Router
+
+      # Import common connection and controller functions to use in pipelines
+      import Plug.Conn
     end
   end
 
@@ -39,7 +40,6 @@ defmodule DemoWeb do
   def controller do
     quote do
       use Phoenix.Controller, formats: [:html, :json]
-
       use Gettext, backend: DemoWeb.Gettext
 
       import Plug.Conn
@@ -82,19 +82,20 @@ defmodule DemoWeb do
       # Translation
       use Gettext, backend: DemoWeb.Gettext
 
+      import DemoWeb.CoreComponents
+      import ExFlowGraphWeb.ExFlow.Canvas
+      import ExFlowGraphWeb.ExFlow.Edge
+      import ExFlowGraphWeb.ExFlow.Node
+
       # HTML escaping functionality
       import Phoenix.HTML
       # Core UI components
-      import DemoWeb.CoreComponents
 
       # Import ExFlowGraph components
-      import ExFlowGraphWeb.ExFlow.Canvas
-      import ExFlowGraphWeb.ExFlow.Node
-      import ExFlowGraphWeb.ExFlow.Edge
+      alias DemoWeb.Layouts
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS
-      alias DemoWeb.Layouts
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())

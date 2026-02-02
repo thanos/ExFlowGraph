@@ -18,12 +18,12 @@ defmodule ExFlowGraph.DataCase do
 
   using do
     quote do
-      alias ExFlowGraph.Repo
-
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
       import ExFlowGraph.DataCase
+
+      alias ExFlowGraph.Repo
     end
   end
 

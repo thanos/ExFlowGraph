@@ -19,15 +19,14 @@ defmodule ExFlowGraphWeb.ConnCase do
 
   using do
     quote do
+      use ExFlowGraphWeb, :verified_routes
+      import ExFlowGraphWeb.ConnCase
+      import Phoenix.ConnTest
+      import Plug.Conn
       # The default endpoint for testing
       @endpoint ExFlowGraphWeb.Endpoint
 
-      use ExFlowGraphWeb, :verified_routes
-
       # Import conveniences for testing with connections
-      import Plug.Conn
-      import Phoenix.ConnTest
-      import ExFlowGraphWeb.ConnCase
     end
   end
 
