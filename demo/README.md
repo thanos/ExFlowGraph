@@ -1,5 +1,9 @@
 # Demo
 
+
+<img width="600"  alt="Screenshot 2026-02-01 at 22 15 34" src="https://github.com/user-attachments/assets/94fc42ba-7908-4709-9515-1aee42a169b2" />
+
+
 To start your Phoenix server:
 
 * Run `mix setup` to install and setup dependencies
