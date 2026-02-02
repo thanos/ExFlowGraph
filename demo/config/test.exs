@@ -4,11 +4,6 @@ import Config
 #
 # The MIX_TEST_PARTITION environment variable can be used
 
-# In test we don't send emails
-# to provide built-in test partitioning in CI environment.
-# Run `mix help test` for more information.
-alias Swoosh.Adapters.Test
-
 config :demo, Demo.Mailer, adapter: Test
 
 config :demo, Demo.Repo,
@@ -35,6 +30,3 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
-
-# Disable swoosh api client as it is only required for production adapters
-config :swoosh, :api_client, false

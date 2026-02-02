@@ -1,8 +1,6 @@
 defmodule DemoWeb.Router do
   use DemoWeb, :router
 
-  alias Plug.Swoosh.MailboxPreview
-
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -40,7 +38,6 @@ defmodule DemoWeb.Router do
       pipe_through :browser
 
       live_dashboard "/dashboard", metrics: DemoWeb.Telemetry
-      forward "/mailbox", MailboxPreview
     end
   end
 end

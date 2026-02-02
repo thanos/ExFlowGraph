@@ -10,8 +10,5 @@ config :logger, level: :info
 # Configures Swoosh API Client
 config :swoosh, api_client: Req
 
-# Disable Swoosh Local Memory Storage
-config :swoosh, local: false
-
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

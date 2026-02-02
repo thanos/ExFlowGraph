@@ -210,10 +210,13 @@ jobs:
 
       - name: Build docs with warnings as errors
         run: |
+          # Compile dependencies first to separate compilation warnings from doc warnings
+          mix compile 2>&1 | grep -v "warning:" || true
+          # Now generate docs and check only doc generation output for warnings
           mix docs 2>&1 | tee docs_output.txt
-          # Check for doc-specific warnings (excluding dependency compilation warnings)
-          if grep -E "warning:|Warning:" docs_output.txt | grep -v "^warning!" | grep -v "conflicts:" | grep -v "is undefined" | grep -v "will never match" | grep -v "unused require" | grep -v "is deprecated" | grep -v "is accessed inside size" | grep -v "is yet to be defined"; then
-            echo "Documentation warnings found"
+          # Check for warnings that occur during doc generation (after "Generating docs...")
+          if sed -n '/Generating docs/,$p' docs_output.txt | grep -i "warning:"; then
+            echo "Documentation generation warnings found"
             exit 1
           fi
 
