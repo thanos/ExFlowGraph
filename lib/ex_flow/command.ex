@@ -1,7 +1,7 @@
 defmodule ExFlow.Command do
   @moduledoc """
   Protocol for undoable commands in ExFlow.
-  
+
   Each command must implement:
   - execute/2: Apply the command to a graph
   - undo/2: Reverse the command on a graph

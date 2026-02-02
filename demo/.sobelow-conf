@@ -1,0 +1,13 @@
+[
+  verbose: true,
+  private: false,
+  skip: false,
+  exit: "high",
+  format: "txt",
+  out: "",
+  threshold: "low",
+  # Ignore security checks that don't apply to demo applications
+  # These would be important for production apps but are not relevant for demos
+  ignore: ["Config.HTTPS", "Config.CSP"],
+  ignore_files: []
+]

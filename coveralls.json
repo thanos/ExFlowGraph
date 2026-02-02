@@ -1,0 +1,12 @@
+{
+  "coverage_options": {
+    "minimum_coverage": 80
+  },
+  "skip_files": [
+    "test/",
+    "lib/ex_flow_graph_web.ex",
+    "lib/ex_flow_graph_web/",
+    "lib/ex_flow/test_graph_generator.ex",
+    "lib/ex_flow/config.ex"
+  ]
+}

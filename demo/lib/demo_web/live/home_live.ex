@@ -1,6 +1,9 @@
 defmodule DemoWeb.HomeLive do
   use DemoWeb, :live_view
 
+  alias ExFlow.Commands.CreateEdgeCommand
+  alias ExFlow.Commands.CreateNodeCommand
+  alias ExFlow.Commands.DeleteNodeCommand
   alias ExFlow.Core.Graph, as: FlowGraph
   alias ExFlow.Storage.InMemory
 
@@ -66,7 +69,7 @@ defmodule DemoWeb.HomeLive do
     edge_id = "edge-#{System.unique_integer([:positive])}"
 
     command =
-      ExFlow.Commands.CreateEdgeCommand.new(
+      CreateEdgeCommand.new(
         edge_id,
         source_id,
         source_handle,
@@ -94,7 +97,7 @@ defmodule DemoWeb.HomeLive do
     y = :rand.uniform(300) + 50
 
     command =
-      ExFlow.Commands.CreateNodeCommand.new(node_id, node_type, %{position: %{x: x, y: y}})
+      CreateNodeCommand.new(node_id, node_type, %{position: %{x: x, y: y}})
 
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
@@ -108,7 +111,7 @@ defmodule DemoWeb.HomeLive do
 
   @impl true
   def handle_event("delete_node", %{"id" => id}, socket) do
-    command = ExFlow.Commands.DeleteNodeCommand.new(id, socket.assigns.graph)
+    command = DeleteNodeCommand.new(id, socket.assigns.graph)
 
     case ExFlow.HistoryManager.execute(socket.assigns.history, command, socket.assigns.graph) do
       {:ok, history, graph} ->
@@ -355,8 +358,7 @@ defmodule DemoWeb.HomeLive do
     all_node_ids =
       socket.assigns.graph
       |> FlowGraph.get_nodes()
-      |> Enum.map(& &1.id)
-      |> MapSet.new()
+      |> MapSet.new(& &1.id)
 
     {:noreply, assign(socket, :selected_node_ids, all_node_ids)}
   end
@@ -368,10 +370,9 @@ defmodule DemoWeb.HomeLive do
     # Delete each node using commands so they can be undone
     result =
       Enum.reduce_while(selected_ids, {:ok, socket.assigns.history, socket.assigns.graph}, fn id,
-                                                                                                {:ok,
-                                                                                                 acc_history,
-                                                                                                 acc_graph} ->
-        command = ExFlow.Commands.DeleteNodeCommand.new(id, acc_graph)
+                                                                                              {:ok, acc_history,
+                                                                                               acc_graph} ->
+        command = DeleteNodeCommand.new(id, acc_graph)
 
         case ExFlow.HistoryManager.execute(acc_history, command, acc_graph) do
           {:ok, new_history, new_graph} -> {:cont, {:ok, new_history, new_graph}}
@@ -472,7 +473,6 @@ defmodule DemoWeb.HomeLive do
             </div>
           </div>
         </div>
-
 
         <%!-- Toolbar --%>
         <div class="mb-6 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
@@ -770,23 +770,40 @@ defmodule DemoWeb.HomeLive do
             <%!-- Canvas Controls --%>
             <div>
               <h3 class="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59"
+                  />
                 </svg>
                 Canvas Controls
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-primary/30">
                   <h4 class="font-medium mb-1">Pan the Canvas</h4>
-                  <p class="text-sm text-base-content/70">Click and drag on the background to move the entire canvas. Perfect for navigating large workflows.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click and drag on the background to move the entire canvas. Perfect for navigating large workflows.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-primary/30">
                   <h4 class="font-medium mb-1">Zoom In/Out</h4>
-                  <p class="text-sm text-base-content/70">Use your mouse wheel to zoom. The zoom centers on your cursor position for precise navigation.</p>
+                  <p class="text-sm text-base-content/70">
+                    Use your mouse wheel to zoom. The zoom centers on your cursor position for precise navigation.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-primary/30">
                   <h4 class="font-medium mb-1">Move Nodes</h4>
-                  <p class="text-sm text-base-content/70">Click and drag any node to reposition it. Connected edges automatically follow the node.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click and drag any node to reposition it. Connected edges automatically follow the node.
+                  </p>
                 </div>
               </div>
             </div>
@@ -794,23 +811,43 @@ defmodule DemoWeb.HomeLive do
             <%!-- Node Management --%>
             <div>
               <h3 class="text-lg font-semibold text-secondary mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                  />
                 </svg>
                 Node Management
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-secondary/30">
                   <h4 class="font-medium mb-1">Add Nodes</h4>
-                  <p class="text-sm text-base-content/70">Click "Add Task" or "Add Agent" in the toolbar. New nodes appear at random positions and can be dragged immediately.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click "Add Task" or "Add Agent" in the toolbar. New nodes appear at random positions and can be dragged immediately.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-secondary/30">
                   <h4 class="font-medium mb-1">Delete Nodes</h4>
-                  <p class="text-sm text-base-content/70">Click the ✕ button on any node in the node list. Deleting a node automatically removes all connected edges.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click the ✕ button on any node in the node list. Deleting a node automatically removes all connected edges.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-secondary/30">
                   <h4 class="font-medium mb-1">Node Types</h4>
-                  <p class="text-sm text-base-content/70"><span class="badge badge-primary badge-sm">Task</span> nodes represent work items. <span class="badge badge-secondary badge-sm">Agent</span> nodes represent actors or services.</p>
+                  <p class="text-sm text-base-content/70">
+                    <span class="badge badge-primary badge-sm">Task</span>
+                    nodes represent work items.
+                    <span class="badge badge-secondary badge-sm">Agent</span>
+                    nodes represent actors or services.
+                  </p>
                 </div>
               </div>
             </div>
@@ -818,23 +855,43 @@ defmodule DemoWeb.HomeLive do
             <%!-- Edge Creation --%>
             <div>
               <h3 class="text-lg font-semibold text-accent mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
+                  />
                 </svg>
                 Edge Creation
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-accent/30">
                   <h4 class="font-medium mb-1">Drag to Connect</h4>
-                  <p class="text-sm text-base-content/70">Click and drag from a <span class="text-primary font-medium">blue handle</span> (source) to a <span class="text-base-content/50 font-medium">gray handle</span> (target) to create an edge.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click and drag from a <span class="text-primary font-medium">blue handle</span>
+                    (source) to a <span class="text-base-content/50 font-medium">gray handle</span>
+                    (target) to create an edge.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-accent/30">
                   <h4 class="font-medium mb-1">Visual Feedback</h4>
-                  <p class="text-sm text-base-content/70">While dragging, you'll see a dashed "ghost edge" following your cursor. Compatible target handles are highlighted.</p>
+                  <p class="text-sm text-base-content/70">
+                    While dragging, you'll see a dashed "ghost edge" following your cursor. Compatible target handles are highlighted.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-accent/30">
                   <h4 class="font-medium mb-1">Cancel Creation</h4>
-                  <p class="text-sm text-base-content/70">Press <kbd class="kbd kbd-xs">Escape</kbd> or release outside a valid target to cancel edge creation.</p>
+                  <p class="text-sm text-base-content/70">
+                    Press <kbd class="kbd kbd-xs">Escape</kbd>
+                    or release outside a valid target to cancel edge creation.
+                  </p>
                 </div>
               </div>
             </div>
@@ -842,26 +899,42 @@ defmodule DemoWeb.HomeLive do
             <%!-- Undo/Redo --%>
             <div>
               <h3 class="text-lg font-semibold text-warning mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+                  />
                 </svg>
                 Undo/Redo
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-warning/30">
                   <h4 class="font-medium mb-1">Command History</h4>
-                  <p class="text-sm text-base-content/70">Every action (create, delete, move) is tracked in a command history with up to 50 operations.</p>
+                  <p class="text-sm text-base-content/70">
+                    Every action (create, delete, move) is tracked in a command history with up to 50 operations.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-warning/30">
                   <h4 class="font-medium mb-1">Undo/Redo Operations</h4>
                   <p class="text-sm text-base-content/70">
-                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Z</kbd> Undo last action •
-                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Shift+Z</kbd> Redo undone action
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+Z</kbd>
+                    Undo last action • <kbd class="kbd kbd-xs">Cmd/Ctrl+Shift+Z</kbd>
+                    Redo undone action
                   </p>
                 </div>
                 <div class="pl-4 border-l-2 border-warning/30">
                   <h4 class="font-medium mb-1">Smart Restoration</h4>
-                  <p class="text-sm text-base-content/70">Deleting a node and undoing restores both the node and its connected edges.</p>
+                  <p class="text-sm text-base-content/70">
+                    Deleting a node and undoing restores both the node and its connected edges.
+                  </p>
                 </div>
               </div>
             </div>
@@ -869,26 +942,44 @@ defmodule DemoWeb.HomeLive do
             <%!-- Selection & Keyboard Shortcuts --%>
             <div>
               <h3 class="text-lg font-semibold text-success mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 Selection & Shortcuts
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-success/30">
                   <h4 class="font-medium mb-1">Single Selection</h4>
-                  <p class="text-sm text-base-content/70">Click a node to select it. Selected nodes have a blue border and ring effect.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click a node to select it. Selected nodes have a blue border and ring effect.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-success/30">
                   <h4 class="font-medium mb-1">Multi-Select</h4>
-                  <p class="text-sm text-base-content/70">Hold <kbd class="kbd kbd-xs">Shift</kbd> or <kbd class="kbd kbd-xs">Cmd/Ctrl</kbd> and click to add/remove nodes from selection.</p>
+                  <p class="text-sm text-base-content/70">
+                    Hold <kbd class="kbd kbd-xs">Shift</kbd>
+                    or <kbd class="kbd kbd-xs">Cmd/Ctrl</kbd>
+                    and click to add/remove nodes from selection.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-success/30">
                   <h4 class="font-medium mb-1">Keyboard Shortcuts</h4>
                   <p class="text-sm text-base-content/70">
-                    <kbd class="kbd kbd-xs">Cmd/Ctrl+A</kbd> Select all •
-                    <kbd class="kbd kbd-xs">Escape</kbd> Clear selection •
-                    <kbd class="kbd kbd-xs">Delete</kbd> Delete selected
+                    <kbd class="kbd kbd-xs">Cmd/Ctrl+A</kbd>
+                    Select all • <kbd class="kbd kbd-xs">Escape</kbd>
+                    Clear selection • <kbd class="kbd kbd-xs">Delete</kbd>
+                    Delete selected
                   </p>
                 </div>
               </div>
@@ -897,23 +988,43 @@ defmodule DemoWeb.HomeLive do
             <%!-- Graph Persistence --%>
             <div>
               <h3 class="text-lg font-semibold text-info mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                  />
                 </svg>
                 Graph Persistence
               </h3>
               <div class="space-y-3">
                 <div class="pl-4 border-l-2 border-info/30">
                   <h4 class="font-medium mb-1">Auto-Save</h4>
-                  <p class="text-sm text-base-content/70">Every change (node move, add, delete, edge creation) is automatically saved to memory.</p>
+                  <p class="text-sm text-base-content/70">
+                    Every change (node move, add, delete, edge creation) is automatically saved to memory.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-info/30">
                   <h4 class="font-medium mb-1">Save & Save As</h4>
-                  <p class="text-sm text-base-content/70"><span class="badge badge-primary badge-sm">Save</span> updates the current graph. <span class="badge badge-outline badge-sm">Save As</span> creates a new copy with a different name.</p>
+                  <p class="text-sm text-base-content/70">
+                    <span class="badge badge-primary badge-sm">Save</span>
+                    updates the current graph.
+                    <span class="badge badge-outline badge-sm">Save As</span>
+                    creates a new copy with a different name.
+                  </p>
                 </div>
                 <div class="pl-4 border-l-2 border-info/30">
                   <h4 class="font-medium mb-1">Load Graphs</h4>
-                  <p class="text-sm text-base-content/70">Click "Load" to browse and load any previously saved graph. The current graph is replaced.</p>
+                  <p class="text-sm text-base-content/70">
+                    Click "Load" to browse and load any previously saved graph. The current graph is replaced.
+                  </p>
                 </div>
               </div>
             </div>
@@ -956,13 +1067,26 @@ defmodule DemoWeb.HomeLive do
           <%!-- Quick Tips --%>
           <div class="mt-6 rounded-lg bg-primary/5 p-4 border border-primary/20">
             <h4 class="font-semibold text-sm mb-2 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="1.5"
+                stroke="currentColor"
+                class="w-4 h-4"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"
+                />
               </svg>
               Pro Tips
             </h4>
             <ul class="text-sm text-base-content/70 space-y-1">
-              <li>• Hold <kbd class="kbd kbd-xs">Shift</kbd> while dragging for precise node placement</li>
+              <li>
+                • Hold <kbd class="kbd kbd-xs">Shift</kbd> while dragging for precise node placement
+              </li>
               <li>• Use the node list to quickly find and delete specific nodes</li>
               <li>• Create multiple named graphs to organize different workflows</li>
               <li>• The current graph name is shown in the header badge</li>
@@ -1053,8 +1177,7 @@ defmodule DemoWeb.HomeLive do
         <div class="modal modal-open">
           <div class="modal-box max-w-2xl">
             <h3 class="text-lg font-bold mb-4">
-              Edit <%= if @editing_type == :node, do: "Node", else: "Edge" %>
-              · <%= @editing_item.id %>
+              Edit {if @editing_type == :node, do: "Node", else: "Edge"} · {@editing_item.id}
             </h3>
 
             <form phx-submit="save_edit">
@@ -1092,24 +1215,24 @@ defmodule DemoWeb.HomeLive do
                 <div class="text-sm space-y-1">
                   <div>
                     <span class="font-semibold">ID:</span>
-                    <span class="font-mono"><%= @editing_item.id %></span>
+                    <span class="font-mono">{@editing_item.id}</span>
                   </div>
                   <%= if @editing_type == :node do %>
                     <div>
                       <span class="font-semibold">Type:</span>
-                      <span><%= @editing_item.type %></span>
+                      <span>{@editing_item.type}</span>
                     </div>
                     <div>
                       <span class="font-semibold">Position:</span>
                       <span>
-                        x: <%= @editing_item.position.x %>, y: <%= @editing_item.position.y %>
+                        x: {@editing_item.position.x}, y: {@editing_item.position.y}
                       </span>
                     </div>
                   <% else %>
                     <div>
                       <span class="font-semibold">Connection:</span>
                       <span>
-                        <%= @editing_item.source %> → <%= @editing_item.target %>
+                        {@editing_item.source} → {@editing_item.target}
                       </span>
                     </div>
                   <% end %>
@@ -1133,7 +1256,7 @@ defmodule DemoWeb.HomeLive do
 
   defp save_node_edit(socket, label_input, metadata_input) do
     node = socket.assigns.editing_item
-    label = if label_input == "", do: nil, else: label_input
+    label = if label_input != "", do: label_input
 
     metadata =
       case Jason.decode(metadata_input) do
@@ -1164,7 +1287,7 @@ defmodule DemoWeb.HomeLive do
 
   defp save_edge_edit(socket, label_input, metadata_input) do
     edge = socket.assigns.editing_item
-    label = if label_input == "", do: nil, else: label_input
+    label = if label_input != "", do: label_input
 
     metadata =
       case Jason.decode(metadata_input) do
@@ -1252,18 +1375,14 @@ defmodule DemoWeb.HomeLive do
           target_x: target.x + 12,
           target_y: target.y + 12
         }
-      else
-        nil
       end
     end)
     |> Enum.reject(&is_nil/1)
   end
 
-  defp title_for(%{label: label, type: :agent, id: id}) when not is_nil(label),
-    do: "#{label} · #{id}"
+  defp title_for(%{label: label, type: :agent, id: id}) when not is_nil(label), do: "#{label} · #{id}"
 
-  defp title_for(%{label: label, type: :task, id: id}) when not is_nil(label),
-    do: "#{label} · #{id}"
+  defp title_for(%{label: label, type: :task, id: id}) when not is_nil(label), do: "#{label} · #{id}"
 
   defp title_for(%{label: label}) when not is_nil(label), do: label
   defp title_for(%{type: :agent, id: id}), do: "Agent · #{id}"

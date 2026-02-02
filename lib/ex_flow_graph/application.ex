@@ -5,11 +5,13 @@ defmodule ExFlowGraph.Application do
 
   use Application
 
+  alias ExFlow.Storage.InMemory
+
   @impl true
   def start(_type, _args) do
     children = [
       # Start the in-memory storage for graphs
-      ExFlow.Storage.InMemory
+      InMemory
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

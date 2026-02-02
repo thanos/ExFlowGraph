@@ -36,7 +36,7 @@ defmodule ExFlow.Commands.DeleteNodeCommandTest do
 
       # Edge should also be deleted (cascade)
       edges = Graph.get_edges(new_graph)
-      assert length(edges) == 0
+      assert Enum.empty?(edges)
     end
 
     test "undo restores the node and its connected edges", %{graph: graph} do
@@ -46,7 +46,7 @@ defmodule ExFlow.Commands.DeleteNodeCommandTest do
 
       # Verify node is deleted
       assert {:error, :node_not_found} = Graph.get_node(graph_after_delete, "node-1")
-      assert length(Graph.get_edges(graph_after_delete)) == 0
+      assert Enum.empty?(Graph.get_edges(graph_after_delete))
 
       # Undo the deletion
       {:ok, graph_after_undo} = DeleteNodeCommand.undo(command, graph_after_delete)
@@ -75,7 +75,7 @@ defmodule ExFlow.Commands.DeleteNodeCommandTest do
       {:ok, graph_after_delete} = DeleteNodeCommand.execute(command, graph)
 
       # Verify both edges are deleted
-      assert length(Graph.get_edges(graph_after_delete)) == 0
+      assert Enum.empty?(Graph.get_edges(graph_after_delete))
 
       # Undo the deletion
       {:ok, graph_after_undo} = DeleteNodeCommand.undo(command, graph_after_delete)

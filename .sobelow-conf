@@ -1,0 +1,12 @@
+[
+  verbose: true,
+  private: false,
+  skip: false,
+  exit: "high",
+  format: "txt",
+  out: "",
+  threshold: "low",
+  # Ignore checks that don't apply to library projects
+  ignore: ["Config.HTTPS"],
+  ignore_files: []
+]

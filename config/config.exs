@@ -7,9 +7,18 @@
 # General application configuration
 import Config
 
-config :ex_flow_graph,
-  ecto_repos: [ExFlowGraph.Repo],
-  generators: [timestamp_type: :utc_datetime]
+# Esbuild not used in this library (no asset pipeline)
+# config :esbuild,
+#   version: "0.25.4",
+#   ex_flow_graph: [
+#     args:
+#       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+#     cd: Path.expand("../assets", __DIR__),
+#     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+#   ]
+
+# Mailer not used in this library
+# config :ex_flow_graph, ExFlowGraph.Mailer, adapter: Swoosh.Adapters.Local
 
 # Configures the endpoint
 config :ex_flow_graph, ExFlowGraphWeb.Endpoint,
@@ -22,35 +31,10 @@ config :ex_flow_graph, ExFlowGraphWeb.Endpoint,
   pubsub_server: ExFlowGraph.PubSub,
   live_view: [signing_salt: "4IjdGZ+D"]
 
-# Configures the mailer
-#
-# By default it uses the "Local" adapter which stores the emails
-# locally. You can see the emails in your browser, at "/dev/mailbox".
-#
-# For production it's recommended to configure a different adapter
-# at the `config/runtime.exs`.
-config :ex_flow_graph, ExFlowGraph.Mailer, adapter: Swoosh.Adapters.Local
-
-# Configure esbuild (the version is required)
-config :esbuild,
-  version: "0.25.4",
-  ex_flow_graph: [
-    args:
-      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
-    cd: Path.expand("../assets", __DIR__),
-    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
-  ]
-
-# Configure tailwind (the version is required)
-config :tailwind,
-  version: "4.1.7",
-  ex_flow_graph: [
-    args: ~w(
-      --input=assets/css/app.css
-      --output=priv/static/assets/css/app.css
-    ),
-    cd: Path.expand("..", __DIR__)
-  ]
+# Ecto not used in this library
+# config :ex_flow_graph,
+#   ecto_repos: [ExFlowGraph.Repo],
+#   generators: [timestamp_type: :utc_datetime]
 
 # Configures Elixir's Logger
 config :logger, :default_formatter,
@@ -59,6 +43,17 @@ config :logger, :default_formatter,
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
+
+# Tailwind not used in this library (CSS is in demo app)
+# config :tailwind,
+#   version: "4.1.7",
+#   ex_flow_graph: [
+#     args: ~w(
+#       --input=assets/css/app.css
+#       --output=priv/static/assets/css/app.css
+#     ),
+#     cd: Path.expand("..", __DIR__)
+#   ]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

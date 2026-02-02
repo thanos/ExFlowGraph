@@ -6,7 +6,7 @@ Build powerful, interactive workflow editors and visual node-based interfaces in
 
 ![Phoenix](https://img.shields.io/badge/Phoenix-1.8+-orange.svg)
 ![LiveView](https://img.shields.io/badge/LiveView-1.0+-purple.svg)
-![Elixir](https://img.shields.io/badge/Elixir-1.15+-purple.svg)
+![Elixir](https://img.shields.io/badge/Elixir-1.16+-purple.svg)
 
 ---
 

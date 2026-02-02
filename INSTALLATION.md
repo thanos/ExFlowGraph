@@ -16,7 +16,7 @@ Complete guide to installing and using ExFlowGraph in your Phoenix LiveView appl
 
 ## Prerequisites
 
-- **Elixir**: >= 1.15
+- **Elixir**: >= 1.16
 - **Phoenix**: >= 1.8
 - **Phoenix LiveView**: >= 1.0
 - **Tailwind CSS**: v4.x (for styling)

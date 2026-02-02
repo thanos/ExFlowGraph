@@ -19,15 +19,15 @@ defmodule DemoWeb.ConnCase do
 
   using do
     quote do
+      use DemoWeb, :verified_routes
+
+      import DemoWeb.ConnCase
+      import Phoenix.ConnTest
+      import Plug.Conn
       # The default endpoint for testing
       @endpoint DemoWeb.Endpoint
 
-      use DemoWeb, :verified_routes
-
       # Import conveniences for testing with connections
-      import Plug.Conn
-      import Phoenix.ConnTest
-      import DemoWeb.ConnCase
     end
   end
 

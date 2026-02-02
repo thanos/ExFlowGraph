@@ -58,15 +58,7 @@ defmodule ExFlow.Core.Graph do
 
   @spec add_edge(t(), String.t(), String.t(), String.t(), String.t(), String.t(), map()) ::
           {:ok, t()} | {:error, term()}
-  def add_edge(
-        %LibGraph{} = graph,
-        id,
-        source_id,
-        source_handle,
-        target_id,
-        target_handle,
-        opts \\ %{}
-      )
+  def add_edge(%LibGraph{} = graph, id, source_id, source_handle, target_id, target_handle, opts \\ %{})
       when is_binary(id) and is_binary(source_id) and is_binary(target_id) do
     edge_label = Map.get(opts, :label)
     edge_metadata = Map.get(opts, :metadata, %{})
@@ -135,8 +127,8 @@ defmodule ExFlow.Core.Graph do
         # Update the node with provided changes
         updated_node =
           node
-          |> maybe_update(:label, updates[:label])
-          |> maybe_update(:metadata, updates[:metadata])
+          |> maybe_update(:label, updates, Map.has_key?(updates, :label))
+          |> maybe_update(:metadata, updates, Map.has_key?(updates, :metadata))
 
         graph = LibGraph.delete_vertex(graph, id)
         graph = LibGraph.add_vertex(graph, id, [updated_node])
@@ -174,8 +166,8 @@ defmodule ExFlow.Core.Graph do
         # Update edge metadata
         updated_edge =
           edge
-          |> maybe_update(:label, updates[:label])
-          |> maybe_update(:metadata, updates[:metadata])
+          |> maybe_update(:label, updates, Map.has_key?(updates, :label))
+          |> maybe_update(:metadata, updates, Map.has_key?(updates, :metadata))
 
         # Remove old edge and add updated one
         graph = LibGraph.delete_edge(graph, edge.source, edge.target)
@@ -183,8 +175,9 @@ defmodule ExFlow.Core.Graph do
     end
   end
 
-  defp maybe_update(map, _key, nil), do: map
-  defp maybe_update(map, key, value), do: Map.put(map, key, value)
+  # Only update if the key is present in the updates map
+  defp maybe_update(map, _key, _updates, false), do: map
+  defp maybe_update(map, key, updates, true), do: Map.put(map, key, updates[key])
 
   @spec delete_node(t(), String.t()) :: {:ok, t()} | {:error, term()}
   def delete_node(%LibGraph{} = graph, id) when is_binary(id) do
@@ -250,15 +243,8 @@ defmodule ExFlow.Core.Graph do
   def validate_node(_), do: {:error, :invalid_node_schema}
 
   @spec validate_edge(graph_edge()) :: :ok | {:error, term()}
-  def validate_edge(%{
-        id: id,
-        source: source,
-        source_handle: sh,
-        target: target,
-        target_handle: th
-      })
-      when is_binary(id) and is_binary(source) and is_binary(sh) and is_binary(target) and
-             is_binary(th) do
+  def validate_edge(%{id: id, source: source, source_handle: sh, target: target, target_handle: th})
+      when is_binary(id) and is_binary(source) and is_binary(sh) and is_binary(target) and is_binary(th) do
     :ok
   end
 
@@ -274,9 +260,8 @@ defmodule ExFlow.Core.Graph do
 
   @spec from_map(%{nodes: [graph_node()], edges: [graph_edge()]}) :: {:ok, t()} | {:error, term()}
   def from_map(%{nodes: nodes, edges: edges}) when is_list(nodes) and is_list(edges) do
-    with {:ok, graph_with_nodes} <- add_nodes(new(), nodes),
-         {:ok, graph_with_edges} <- add_edges(graph_with_nodes, edges) do
-      {:ok, graph_with_edges}
+    with {:ok, graph_with_nodes} <- add_nodes(new(), nodes) do
+      add_edges(graph_with_nodes, edges)
     end
   end
 
@@ -286,10 +271,13 @@ defmodule ExFlow.Core.Graph do
 
   defp add_nodes(graph, nodes) do
     Enum.reduce_while(nodes, {:ok, graph}, fn node, {:ok, acc_graph} ->
-      case add_node(acc_graph, node.id, node.type, %{
-             position: node.position,
-             metadata: node.metadata
-           }) do
+      opts = %{
+        position: node.position,
+        label: Map.get(node, :label),
+        metadata: node.metadata
+      }
+
+      case add_node(acc_graph, node.id, node.type, opts) do
         {:ok, new_graph} -> {:cont, {:ok, new_graph}}
         error -> {:halt, error}
       end
@@ -298,13 +286,19 @@ defmodule ExFlow.Core.Graph do
 
   defp add_edges(graph, edges) do
     Enum.reduce_while(edges, {:ok, graph}, fn edge, {:ok, acc_graph} ->
+      opts = %{
+        label: Map.get(edge, :label),
+        metadata: Map.get(edge, :metadata, %{})
+      }
+
       case add_edge(
              acc_graph,
              edge.id,
              edge.source,
              edge.source_handle,
              edge.target,
-             edge.target_handle
+             edge.target_handle,
+             opts
            ) do
         {:ok, new_graph} -> {:cont, {:ok, new_graph}}
         error -> {:halt, error}
