@@ -283,4 +283,5 @@ jobs:
       - name: Check assets are up to date
         run: |
           mix assets.deploy
-          git diff --exit-code priv/static/ || (echo "Assets are out of date. Run 'mix assets.deploy' and commit the changes." && exit 1)
+          # Ignore .gz files as gzip compression can vary between environments
+          git diff --exit-code -- priv/static/ ':(exclude)*.gz' || (echo "Assets are out of date. Run 'mix assets.deploy' and commit the changes." && exit 1)
