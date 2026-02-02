@@ -85,8 +85,7 @@ defmodule ExFlowGraph.MixProject do
 
   defp package do
     [
-      files:
-        ~w(lib priv assets .formatter.exs mix.exs README* LICENSE INSTALLATION.md CHANGELOG.md guides),
+      files: ~w(lib priv assets .formatter.exs mix.exs README* LICENSE INSTALLATION.md CHANGELOG.md guides),
       licenses: ["MIT"],
       links: %{
         "GitHub" => "https://github.com/thanos/ExFlowGraph",

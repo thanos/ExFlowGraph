@@ -103,5 +103,4 @@ if config_env() == :prod do
   #
   # In production you need to configure the mailer to use a different adapter.
   # Here is an example configuration for Mailgun:
-
 end
