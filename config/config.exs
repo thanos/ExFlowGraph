@@ -17,9 +17,6 @@ import Config
 #     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
 #   ]
 
-# Mailer not used in this library
-# config :ex_flow_graph, ExFlowGraph.Mailer, adapter: Swoosh.Adapters.Local
-
 # Configures the endpoint
 config :ex_flow_graph, ExFlowGraphWeb.Endpoint,
   url: [host: "localhost"],

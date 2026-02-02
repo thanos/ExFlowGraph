@@ -24,8 +24,8 @@ defmodule ExFlowGraph.MixProject do
 
       # Docs
       name: "ExFlowGraph",
-      source_url: "https://github.com/your-org/ex_flow_graph",
-      homepage_url: "https://github.com/your-org/ex_flow_graph",
+      source_url: "https://github.com/thanos/ExFlowGraph",
+      homepage_url: "https://github.com/thanos/ExFlowGraph",
       docs: docs(),
 
       # Test coverage
@@ -85,9 +85,13 @@ defmodule ExFlowGraph.MixProject do
 
   defp package do
     [
-      files: ~w(lib priv assets .formatter.exs mix.exs README* INSTALLATION.md guides),
+      files: ~w(lib priv assets .formatter.exs mix.exs README* LICENSE INSTALLATION.md CHANGELOG.md guides),
       licenses: ["MIT"],
-      links: %{}
+      links: %{
+        "GitHub" => "https://github.com/thanos/ExFlowGraph",
+        "Changelog" => "https://github.com/thanos/ExFlowGraph/blob/main/CHANGELOG.md"
+      },
+      maintainers: ["Thanos Vassilakis"]
     ]
   end
 
