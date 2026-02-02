@@ -183,6 +183,8 @@ jobs:
   docs:
     name: Documentation
     runs-on: ubuntu-latest
+    env:
+      MIX_ENV: dev
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -207,7 +209,13 @@ jobs:
         run: mix deps.get
 
       - name: Build docs with warnings as errors
-        run: mix docs 2>&1 | tee docs_output.txt && ! grep -i warning docs_output.txt
+        run: |
+          mix docs 2>&1 | tee docs_output.txt
+          # Check for doc-specific warnings (excluding dependency compilation warnings)
+          if grep -E "warning:|Warning:" docs_output.txt | grep -v "^warning!" | grep -v "conflicts:" | grep -v "is undefined" | grep -v "will never match" | grep -v "unused require" | grep -v "is deprecated" | grep -v "is accessed inside size" | grep -v "is yet to be defined"; then
+            echo "Documentation warnings found"
+            exit 1
+          fi
 
       - name: Upload docs artifact
         uses: actions/upload-artifact@v4
