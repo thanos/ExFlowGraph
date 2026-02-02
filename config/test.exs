@@ -7,7 +7,6 @@ import Config
 # In test we don't send emails
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
-alias Swoosh.Adapters.Test
 
 config :ex_flow_graph, ExFlowGraph.Mailer, adapter: Test
 
